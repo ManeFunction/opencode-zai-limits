@@ -1,0 +1,51 @@
+{
+  "name": "opencode-glm-limits",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Credit meter and usage reports for the Z.ai GLM Coding Plan in OpenCode v2 \u2014 a footer status line and a /glm-limits command, with zero dependencies",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./tui": "./src/tui.tsx"
+  },
+  "files": [
+    "dist",
+    "src",
+    "integration",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "zai",
+    "z.ai",
+    "zhipu",
+    "glm",
+    "quota",
+    "credits",
+    "usage",
+    "coding-plan",
+    "ai",
+    "llm"
+  ],
+  "author": "Ilia Petrov-Komotskii <ManeFunction>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ManeFunction/opencode-glm-limits.git"
+  },
+  "homepage": "https://github.com/ManeFunction/opencode-glm-limits#readme",
+  "bugs": {
+    "url": "https://github.com/ManeFunction/opencode-glm-limits/issues"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^20.0.0"
+  }
+}

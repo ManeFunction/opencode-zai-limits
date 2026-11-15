@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "resolveJsonModule": true,
+    "noEmitOnError": true
+  },
+  // The server part only. src/tui.tsx is intentionally excluded: it uses
+  // Solid JSX for OpenCode's own OpenTUI runtime and is compiled by OpenCode
+  // at load time — it ships as source.
+  "include": ["src/index.ts", "src/api/**/*.ts", "src/utils/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
