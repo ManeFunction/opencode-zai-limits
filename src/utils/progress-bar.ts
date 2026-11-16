@@ -20,24 +20,10 @@ export function createProgressBar(percentage: number): string {
 }
 
 /**
- * Format percentage with sign
- * @param percentage - Percentage value
- * @param decimals - Decimal places (default: 1)
- * @returns Formatted percentage string (e.g., '40.5%')
- */
-export function formatPercentage(percentage: number, decimals: number = 1): string {
-  return `${percentage.toFixed(decimals)}%`
-}
-
-/**
  * Format progress bar as Markdown code span for table cell
- * @param _label - Label (unused in Markdown table — label is separate cell)
  * @param percentage - Percentage value
  * @returns Code-spanned progress bar (e.g., '`█████░░░░░░░`')
  */
-export function formatProgressLine(
-  _label: string,
-  percentage: number
-): string {
+export function formatProgressLine(percentage: number): string {
   return '`' + createProgressBar(percentage) + '`'
 }

@@ -108,7 +108,7 @@ function formatQuotaLimitsTable(quota: Quota, now: number): string {
       return [
         label,
         window.percentage === null ? '—' : `${percentage.toFixed(1)}%`,
-        formatProgressLine('', percentage),
+        formatProgressLine(percentage),
         resets ? formatResetCell(window.resetsAt, now) : '—'
       ];
     });

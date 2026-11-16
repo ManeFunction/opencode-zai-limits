@@ -1,6 +1,6 @@
 /**
  * Date formatter module
- * Formats dates as yyyy-MM-dd HH:mm:ss
+ * Formats dates as yyyy-MM-dd HH:mm:ss (local time)
  */
 
 /**
@@ -16,26 +16,4 @@ export function formatDateTime(date: Date): string {
   const minutes = String(date.getMinutes()).padStart(2, '0');
   const seconds = String(date.getSeconds()).padStart(2, '0');
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
-/**
- * Parse datetime string back to Date
- * @param dateTime - Formatted datetime string (yyyy-MM-dd HH:mm:ss)
- * @returns Date object
- */
-export function parseDateTime(dateTime: string): Date {
-  const dateTimeRegex = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
-  const match = dateTimeRegex.exec(dateTime);
-  if (!match) {
-    throw new Error(`Invalid datetime format: ${dateTime}`);
-  }
-  const [, year, month, day, hours, minutes, seconds] = match;
-  return new Date(
-    Number.parseInt(year),
-    Number.parseInt(month) - 1,
-    Number.parseInt(day),
-    Number.parseInt(hours),
-    Number.parseInt(minutes),
-    Number.parseInt(seconds)
-  );
 }

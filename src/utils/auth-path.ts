@@ -12,7 +12,6 @@
  * (regression: issues #39 / #41).
  */
 
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
@@ -60,24 +59,4 @@ export function getAuthFilePathCandidates(opts?: AuthFilePathOptions): string[] 
   }
 
   return [xdgPath];
-}
-
-/**
- * Resolve the auth.json path to use, returning the first existing candidate.
- *
- * Probes each candidate returned by {@link getAuthFilePathCandidates} with
- * fs.existsSync(); returns the first match. If none exist, returns
- * candidates[0] so callers can still surface a sensible path.
- *
- * @param opts - Optional overrides for homedir/platform/localAppData (testing).
- * @returns The resolved auth.json path.
- */
-export function resolveAuthFilePath(opts?: AuthFilePathOptions): string {
-  const candidates = getAuthFilePathCandidates(opts);
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return candidates[0];
 }

@@ -99,14 +99,3 @@ export function createMarkdownError(
 
   return parts.join('\n')
 }
-
-/**
- * @deprecated Use createMarkdownError() instead. Will be removed in v2.0.
- */
-export function createBoxedError(message: string): string {
-  return createMarkdownError(
-    'Error',
-    {},
-    message
-  )
-}

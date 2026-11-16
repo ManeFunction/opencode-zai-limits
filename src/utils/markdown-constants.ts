@@ -6,10 +6,6 @@
  * Glamour TUI does NOT render: --- rules, > blockquotes, HTML.
  */
 
-// ============================================================
-// v1.7.0 Markdown Format Constants
-// ============================================================
-
 /** Main title prefix for usage report header */
 export const MAIN_TITLE_PREFIX = '### 📊 Z.ai GLM Coding Plan — ' as const
 
@@ -43,23 +39,6 @@ export const MCP_TOOL_LABELS = {
 export const ERROR_FORMAT = {
   TITLE_PREFIX: '### ⚠️ ',
   FIX_HEADER: '**How to fix:**',
-} as const
-
-// ============================================================
-// Legacy constants (removed in Slices 2-5)
-// ============================================================
-
-/** @deprecated Remove after Slice 5 rewrites index.ts */
-export const BOX_WIDTH = {
-  CONTENT: 56,
-  BORDER_CHARS: 58,
-  TOTAL: 60,
-  PADDING: 2,
-} as const
-
-/** @deprecated Remove after Slice 5 rewrites index.ts */
-export const HEADER = {
-  TITLE_PAD_START: 35,
 } as const
 
 /** Progress bar characters and width for Markdown code spans */

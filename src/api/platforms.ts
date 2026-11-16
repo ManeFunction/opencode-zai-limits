@@ -31,15 +31,13 @@ function detectPlatform(providerId: string): Platform | null {
  * @param platform - The platform type
  * @returns Human-readable platform name
  */
+const PLATFORM_NAMES: Record<Platform, string> = {
+  ZAI: 'Z.AI',
+  ZHIPU: 'ZHIPU'
+};
+
 function getPlatformName(platform: Platform): string {
-  switch (platform) {
-    case 'ZAI':
-      return 'Z.AI';
-    case 'ZHIPU':
-      return 'ZHIPU';
-    default:
-      return platform;
-  }
+  return PLATFORM_NAMES[platform];
 }
 
 export type { Platform };

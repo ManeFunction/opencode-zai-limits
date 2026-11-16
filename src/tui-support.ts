@@ -13,4 +13,3 @@ export { queryEndpoint } from './api/client.js';
 export { parseQuota } from './quota.js';
 export type { Quota, QuotaWindow } from './quota.js';
 export { formatDuration, timeUntil } from './utils/duration.js';
-export { GlmReportError } from './utils/error-formatter.js';

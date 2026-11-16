@@ -1,9 +1,18 @@
 /**
  * API endpoints module
- * Defines all API endpoints for ZAI and ZHIPU platforms
+ * Defines the monitor endpoints for the ZAI and ZHIPU platforms
  */
 
 import type { Platform } from './platforms.js';
+
+/**
+ * Endpoint URLs type
+ */
+type Endpoints = {
+  readonly modelUsage: string;
+  readonly toolUsage: string;
+  readonly quotaLimit: string;
+};
 
 /**
  * API endpoints configuration by platform
@@ -18,22 +27,8 @@ const ENDPOINTS = {
     modelUsage: 'https://open.bigmodel.cn/api/monitor/usage/model-usage',
     toolUsage: 'https://open.bigmodel.cn/api/monitor/usage/tool-usage',
     quotaLimit: 'https://open.bigmodel.cn/api/monitor/usage/quota/limit'
-  },
-  ZHIPU_DEV: {
-    modelUsage: 'https://dev.bigmodel.cn/api/monitor/usage/model-usage',
-    toolUsage: 'https://dev.bigmodel.cn/api/monitor/usage/tool-usage',
-    quotaLimit: 'https://dev.bigmodel.cn/api/monitor/usage/quota/limit'
   }
-} as const;
-
-/**
- * Endpoint URLs type
- */
-type Endpoints = {
-  readonly modelUsage: string;
-  readonly toolUsage: string;
-  readonly quotaLimit: string;
-};
+} as const satisfies Record<Platform, Endpoints>;
 
 /**
  * Get endpoints for a platform
@@ -41,14 +36,9 @@ type Endpoints = {
  * @returns Endpoints configuration
  */
 function getEndpoints(platform: Platform): Endpoints {
-  switch (platform) {
-    case 'ZAI':
-      return ENDPOINTS.ZAI;
-    case 'ZHIPU':
-      return ENDPOINTS.ZHIPU;
-    default:
-      return ENDPOINTS.ZAI;
-  }
+  // Keyed by Platform: a new platform without endpoints fails to compile
+  // instead of silently falling back to api.z.ai.
+  return ENDPOINTS[platform];
 }
 
 export type { Endpoints };
