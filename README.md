@@ -1,4 +1,4 @@
-# opencode-glm-limits
+# opencode-zai-limits
 
 A credit meter and usage reporter for the [Z.ai GLM Coding Plan](https://z.ai/subscribe), living inside
 [OpenCode v2](https://opencode.ai). It draws your remaining credits into the status line right below the
