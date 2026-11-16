@@ -17,6 +17,33 @@ export function sanitizeToken(message: string, token?: string): string {
 }
 
 /**
+ * An error whose message is a ready-to-show, token-sanitized Markdown block
+ * (built with {@link createMarkdownError}). Callers check it with
+ * `instanceof` and show `message` as is; any other error is wrapped first.
+ */
+export class GlmReportError extends Error {
+  /** HTTP status of the failed request, when there was one. */
+  readonly status: number | undefined
+
+  constructor(markdown: string, status?: number) {
+    super(markdown)
+    this.name = 'GlmReportError'
+    this.status = status
+  }
+}
+
+/**
+ * One-line summary of a report error, e.g. "Authentication Failed (401)".
+ */
+export function summarizeError(error: unknown): string {
+  if (error instanceof GlmReportError) {
+    const title = error.message.split('\n')[0].replace(ERROR_FORMAT.TITLE_PREFIX, '').trim()
+    return error.status ? `${title} (${error.status})` : title
+  }
+  return 'Request failed'
+}
+
+/**
  * Create a Markdown-formatted error message for Glamour TUI rendering.
  *
  * Format:

@@ -5,7 +5,7 @@
 
 import * as https from 'node:https';
 import type { Endpoints } from './endpoints.js';
-import { sanitizeToken, createMarkdownError } from '../utils/error-formatter.js';
+import { sanitizeToken, createMarkdownError, GlmReportError } from '../utils/error-formatter.js';
 
 /**
  * HTTP request timeout in milliseconds (10 seconds)
@@ -57,7 +57,7 @@ interface RequestOptions {
  * @param authToken - Auth token to sanitize from error messages
  * @returns Formatted error with Markdown message
  */
-function formatNetworkError(error: NetworkError, authToken: string): Error {
+function formatNetworkError(error: NetworkError, authToken: string): GlmReportError {
   const code = error.code;
   let message = '';
 
@@ -77,12 +77,15 @@ function formatNetworkError(error: NetworkError, authToken: string): Error {
     );
   } else {
     // Other network errors - sanitize token from original message
-    message = sanitizeToken(error.message, authToken);
+    message = createMarkdownError(
+      'Request Failed',
+      code ? { Code: code } : {},
+      sanitizeToken(error.message, authToken),
+      ['Check your network connection.', 'Try again.']
+    );
   }
 
-  const formattedError = new Error(message) as NetworkError;
-  formattedError.code = code;
-  return formattedError;
+  return new GlmReportError(message);
 }
 
 function formatErrorWithDetails(
@@ -111,7 +114,7 @@ function formatErrorWithDetails(
  * @param authToken - Auth token to sanitize from error messages
  * @returns Formatted error with Markdown message
  */
-function formatAuthError(statusCode: number, responseBody: string, authToken: string): Error {
+function formatAuthError(statusCode: number, responseBody: string, authToken: string): GlmReportError {
   // Sanitize response body first to prevent token exposure
   const sanitizedBody = sanitizeToken(responseBody, authToken);
   let message = '';
@@ -143,7 +146,7 @@ function formatAuthError(statusCode: number, responseBody: string, authToken: st
     );
   }
 
-  return new Error(message);
+  return new GlmReportError(message, statusCode);
 }
 
 /**
@@ -153,7 +156,7 @@ function formatAuthError(statusCode: number, responseBody: string, authToken: st
  * @param authToken - Auth token to sanitize from error messages
  * @returns Formatted error with Markdown message
  */
-function formatApiError(statusCode: number, responseBody: string, authToken: string): Error {
+function formatApiError(statusCode: number, responseBody: string, authToken: string): GlmReportError {
   // Sanitize response body first to prevent token exposure
   const sanitizedBody = sanitizeToken(responseBody, authToken);
   let message = '';
@@ -185,7 +188,7 @@ function formatApiError(statusCode: number, responseBody: string, authToken: str
     );
   }
 
-  return new Error(message);
+  return new GlmReportError(message, statusCode);
 }
 
 /**
@@ -194,13 +197,13 @@ function formatApiError(statusCode: number, responseBody: string, authToken: str
  * @param authToken - Auth token to sanitize from error messages
  * @returns Formatted error with Markdown message
  */
-function formatParseError(responseBody: string, authToken: string): Error {
+function formatParseError(responseBody: string, authToken: string): GlmReportError {
   // Sanitize response body first to prevent token exposure
   const sanitizedBody = sanitizeToken(responseBody, authToken);
   
   // Use simple message if body is empty
   if (!sanitizedBody) {
-    return new Error(createMarkdownError(
+    return new GlmReportError(createMarkdownError(
       'Unexpected Response',
       {},
       'Invalid JSON response. The server returned malformed data.',
@@ -219,7 +222,7 @@ function formatParseError(responseBody: string, authToken: string): Error {
     'Invalid JSON response. The server returned malformed data.',
     ['Try again later.']
   );
-  return new Error(message);
+  return new GlmReportError(message);
 }
 
 /**
@@ -258,29 +261,37 @@ function makeRequest(options: RequestOptions): Promise<ApiResponse> {
       });
 
       res.on('end', () => {
-        if (res.statusCode !== 200) {
-          // Use appropriate error formatter based on status code
-          const statusCode = res.statusCode!;
-          
-          if (statusCode === 401 || statusCode === 403) {
-            reject(formatAuthError(statusCode, data, options.authToken));
-          } else if (statusCode >= 400 && statusCode < 500) {
-            // 429 and other client errors
-            reject(formatApiError(statusCode, data, options.authToken));
-          } else {
-            // 500+ server errors
-            reject(formatApiError(statusCode, data, options.authToken));
-          }
+        const statusCode = res.statusCode ?? 0;
+        if (statusCode !== 200) {
+          reject(
+            statusCode === 401 || statusCode === 403
+              ? formatAuthError(statusCode, data, options.authToken)
+              : formatApiError(statusCode, data, options.authToken)
+          );
           return;
         }
 
+        let json: ApiResponse;
         try {
-          const json = JSON.parse(data) as ApiResponse;
-          resolve(json);
+          json = JSON.parse(data) as ApiResponse;
         } catch {
           // Use formatParseError for invalid JSON responses
           reject(formatParseError(data, options.authToken));
+          return;
         }
+        // The monitor API reports most failures (a bad key included) as HTTP
+        // 200 with an envelope: {"code":401,"msg":"…","success":false}.
+        if (json.success === false) {
+          const code = typeof json.code === 'number' ? json.code : 0;
+          const msg = typeof json.msg === 'string' ? json.msg : '';
+          reject(
+            code === 401 || code === 403
+              ? formatAuthError(code, msg, options.authToken)
+              : formatApiError(code, msg, options.authToken)
+          );
+          return;
+        }
+        resolve(json);
       });
     });
 
@@ -321,4 +332,4 @@ async function queryEndpoint(
 }
 
 export type { ApiResponse };
-export { makeRequest, queryEndpoint, formatNetworkError, createMarkdownError, formatAuthError, formatApiError, formatParseError };
+export { queryEndpoint };

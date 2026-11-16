@@ -30,7 +30,7 @@ import {
   ROW_EMOJI,
   SECTION_HEADERS
 } from './utils/markdown-constants.js';
-import { createMarkdownError } from './utils/error-formatter.js';
+import { createMarkdownError, GlmReportError, summarizeError } from './utils/error-formatter.js';
 import {
   FIVE_HOUR_TOKEN_LIMIT_LABEL,
   getTokenLimitLabel,
@@ -341,6 +341,10 @@ function formatToolUsageTable(toolData: Record<string, unknown> | null): string 
   return formatMarkdownTable(['Tool', 'Count'], ['------', '------:'], rows.length > 0 ? rows : [['No tool usage data available', '—']]);
 }
 
+function unavailable(reason: string): string {
+  return `⚠️ Unavailable: ${reason}`;
+}
+
 function formatMarkdownOutput(
   credentials: Credentials,
   startTime: string,
@@ -348,7 +352,8 @@ function formatMarkdownOutput(
   quotaData: ProcessedQuotaLimit | null,
   modelData: Record<string, unknown> | null,
   toolData: Record<string, unknown> | null,
-  detailed: boolean
+  detailed: boolean,
+  failures: Record<string, string> = {}
 ): string {
   const platformName = getPlatformName(credentials.platform);
   const level = quotaData?.level as string | undefined;
@@ -357,8 +362,8 @@ function formatMarkdownOutput(
     `${SECTION_HEADERS.QUOTA_LIMITS}\n\n${formatQuotaLimitsTable(quotaData)}`,
     `${SECTION_HEADERS.QUOTA_USAGE}\n\n${formatQuotaUsageTable(quotaData)}`,
     `${SECTION_HEADERS.MCP_BREAKDOWN}\n\n${formatMcpBreakdownTable(quotaData)}`,
-    `${SECTION_HEADERS.MODEL_USAGE}\n\n${formatModelUsageTable(modelData, quotaData, detailed)}`,
-    `${SECTION_HEADERS.TOOL_USAGE}\n\n${formatToolUsageTable(toolData)}`
+    `${SECTION_HEADERS.MODEL_USAGE}\n\n${failures.modelUsage ? unavailable(failures.modelUsage) : formatModelUsageTable(modelData, quotaData, detailed)}`,
+    `${SECTION_HEADERS.TOOL_USAGE}\n\n${failures.toolUsage ? unavailable(failures.toolUsage) : formatToolUsageTable(toolData)}`
   ].join('\n\n');
 }
 
@@ -393,23 +398,28 @@ async function queryAllUsage(credentials: Credentials, detailed: boolean): Promi
   const endpoints = getEndpoints(credentials.platform);
   const { startTime, endTime } = getTimeWindow();
   const queryParams = getTimeWindowQueryParams();
-  // Query all endpoints
-  const [quotaResponse, modelResponse, toolResponse] = await Promise.all([
-    queryEndpoint(endpoints, credentials.token, 'quotaLimit').catch(() => null),
-    queryEndpoint(endpoints, credentials.token, 'modelUsage', queryParams).catch(() => null),
-    queryEndpoint(endpoints, credentials.token, 'toolUsage', queryParams).catch(() => null)
+  const [quotaResult, modelResult, toolResult] = await Promise.allSettled([
+    queryEndpoint(endpoints, credentials.token, 'quotaLimit'),
+    queryEndpoint(endpoints, credentials.token, 'modelUsage', queryParams),
+    queryEndpoint(endpoints, credentials.token, 'toolUsage', queryParams)
   ]);
-  // Process responses
-  const quotaData = quotaResponse
-    ? processQuotaLimit(quotaResponse.data)
+  // Without the quota response there is no report worth showing (and a bad
+  // key fails all three calls the same way): surface that error instead of
+  // an empty report.
+  if (quotaResult.status === 'rejected') {
+    throw quotaResult.reason;
+  }
+  const quotaData = processQuotaLimit(quotaResult.value.data);
+  const modelData = modelResult.status === 'fulfilled'
+    ? ((modelResult.value.data || modelResult.value) as Record<string, unknown>)
     : null;
-  const modelData = modelResponse
-    ? ((modelResponse.data || modelResponse) as Record<string, unknown>)
+  const toolData = toolResult.status === 'fulfilled'
+    ? ((toolResult.value.data || toolResult.value) as Record<string, unknown>)
     : null;
-  const toolData = toolResponse
-    ? ((toolResponse.data || toolResponse) as Record<string, unknown>)
-    : null;
-  return formatMarkdownOutput(credentials, startTime, endTime, quotaData, modelData, toolData, detailed);
+  const failures: Record<string, string> = {};
+  if (modelResult.status === 'rejected') failures.modelUsage = summarizeError(modelResult.reason);
+  if (toolResult.status === 'rejected') failures.toolUsage = summarizeError(toolResult.reason);
+  return formatMarkdownOutput(credentials, startTime, endTime, quotaData, modelData, toolData, detailed, failures);
 }
 
 /**
@@ -427,11 +437,10 @@ export async function executeGlmQuota(input?: { detailed?: boolean }): Promise<s
     }
     return await queryAllUsage(credentials, detailed);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.trim().startsWith('### ⚠️ ')) {
-      return errorMessage;
+    if (error instanceof GlmReportError) {
+      return error.message;
     }
-    return createMarkdownError('Error', {}, errorMessage);
+    return createMarkdownError('Error', {}, error instanceof Error ? error.message : String(error));
   }
 }
 

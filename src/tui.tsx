@@ -309,8 +309,12 @@ export default {
           fiveHour: limits.find((l) => isQuotaWindow(l, 3, 5)) ?? null,
           weekly: limits.find((l) => isQuotaWindow(l, 6, 1)) ?? null,
         })
-      } catch {
-        // keep last good data; meter just stays stale until next tick
+      } catch (error) {
+        // A rejected key will not fix itself: say so instead of showing the
+        // last numbers forever. Anything else (timeout, 5xx) is transient —
+        // keep the last good data until the next tick.
+        const status = error?.status
+        if (status === 401 || status === 403) setData({ authFailed: true })
       }
     }
 
@@ -320,6 +324,7 @@ export default {
 
     const statusText = (d) => {
       if (!d) return null
+      if (d.authFailed) return 'z.ai | key rejected — run /connect'
       const parts = []
 
       // 5h window: "3h 33m : 55%"; when full (100%), "5h : 100%"
@@ -362,7 +367,7 @@ export default {
       }
       const txt = statusText(d)
       if (!txt) return <text> </text>
-      const fg = colorFor(remainingPct(d.fiveHour))
+      const fg = d.authFailed ? RED : colorFor(remainingPct(d.fiveHour))
       return <text fg={fg}>{txt}</text>
     }
 
