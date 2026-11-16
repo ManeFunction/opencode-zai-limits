@@ -10,15 +10,17 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": false,
+    "declaration": true,
     "declarationMap": false,
     "sourceMap": false,
     "resolveJsonModule": true,
     "noEmitOnError": true
   },
-  // The server part only. src/tui.tsx is intentionally excluded: it uses
-  // Solid JSX for OpenCode's own OpenTUI runtime and is compiled by OpenCode
-  // at load time — it ships as source.
-  "include": ["src/index.ts", "src/api/**/*.ts", "src/utils/**/*.ts"],
+  // The server part only. src/tui.tsx is not compiled here: it uses Solid
+  // JSX for OpenCode's own OpenTUI runtime and is compiled by OpenCode at
+  // load time — it ships as source. It is type-checked separately by
+  // tsconfig.tui.json (`npm run typecheck`), against the declarations
+  // emitted here.
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -39,12 +39,69 @@ import { createSignal, For, Show } from 'solid-js'
 // Namespace import on purpose: a missing named export would fail the whole
 // module (and take the meter down with it); here it is just undefined.
 import * as opentui from '@opentui/solid'
-import { getCredentials } from '../dist/utils/credentials.js'
-import { getEndpoints } from '../dist/api/endpoints.js'
-import { queryEndpoint } from '../dist/api/client.js'
-import { parseQuota } from '../dist/quota.js'
-import { formatDuration, timeUntil } from '../dist/utils/duration.js'
-import { executeGlmQuota } from '../dist/index.js'
+import {
+  detectPlatform,
+  executeGlmQuota,
+  formatDuration,
+  getCredentials,
+  getEndpoints,
+  parseQuota,
+  queryEndpoint,
+  timeUntil,
+} from '../dist/tui-support.js'
+import type { Quota, QuotaWindow } from '../dist/tui-support.js'
+
+// ============================================================================
+// HOST API SHAPES
+// ============================================================================
+// The TUI plugin API is not in the published plugin types yet; these are the
+// parts this file uses, as OpenCode 2.3's built-in plugins call them. Types
+// only — erased at load time.
+
+interface Theme {
+  text: { base?: string; muted?: string; accent?: string }
+  primary?: string
+}
+
+interface SlotProps {
+  sessionID?: string
+}
+
+interface TuiContext {
+  theme: Theme
+  renderer?: { height?: number }
+  ui: {
+    dialog: {
+      show(render: () => JSX.Element): void
+      set(options: { size: 'large' | 'medium' | 'small' }): void
+    }
+    model: { current(): { providerID?: string } | null | undefined }
+    slot(options: { append: string; render: (props?: SlotProps) => JSX.Element }): void
+  }
+  keymap: { layer(build: () => unknown): void }
+}
+
+interface ScrollBox {
+  scrollBy(delta: number): void
+  scrollTo(position: number): void
+  scrollHeight: number
+}
+
+/** What the footer shows: a quota snapshot, or a rejected key. */
+type MeterState = { authFailed: false; quota: Quota } | { authFailed: true }
+
+interface TableColumn {
+  title: string
+  right: boolean
+  cells: string[]
+}
+
+type Block =
+  | { type: 'blank' }
+  | { type: 'heading'; level: number; text: string }
+  | { type: 'bullet'; text: string }
+  | { type: 'paragraph'; text: string }
+  | { type: 'table'; columns: TableColumn[] }
 
 const REFRESH_MS = 2 * 60 * 1000
 
@@ -53,23 +110,12 @@ const YELLOW = '#eab308'
 const RED = '#ef4444'
 const DIM = '#808080'
 
-function isZaiProvider(providerID) {
-  const s = String(providerID ?? '').toLowerCase()
-  return (
-    s.includes('zai') ||
-    s === 'z.ai' ||
-    s === 'z-ai' ||
-    s.includes('zhipu') ||
-    s.includes('bigmodel')
-  )
-}
-
-function remainingPct(window) {
+function remainingPct(window: QuotaWindow | null | undefined): number | null {
   if (!window || window.percentage === null) return null
   return Math.max(0, Math.min(100, 100 - window.percentage))
 }
 
-function colorFor(pct) {
+function colorFor(pct: number | null): string {
   if (pct === null) return DIM
   if (pct > 50) return GREEN
   if (pct > 20) return YELLOW
@@ -82,7 +128,7 @@ function colorFor(pct) {
 
 // Reads a theme token defensively: the plugin theme shape is not a published
 // API, so fall back to a fixed color when a path is missing.
-function themeColor(context, pick, fallback) {
+function themeColor(context: TuiContext, pick: (theme: Theme) => string | undefined, fallback: string): string {
   try {
     return pick(context.theme) ?? fallback
   } catch {
@@ -92,13 +138,13 @@ function themeColor(context, pick, fallback) {
 
 // Splits the small Markdown subset the report uses into blocks:
 // headings, tables, bullets, paragraphs and blank lines.
-function parseReport(markdown) {
+function parseReport(markdown: string | null): Block[] {
   const lines = String(markdown ?? '').split('\n')
-  const blocks = []
+  const blocks: Block[] = []
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     if (line.trim().startsWith('|')) {
-      const rows = []
+      const rows: string[][] = []
       while (i < lines.length && lines[i].trim().startsWith('|')) {
         rows.push(
           lines[i]
@@ -139,7 +185,7 @@ function parseReport(markdown) {
 }
 
 // Inline Markdown: **bold** becomes <b>, `code` loses its backticks.
-function inline(text) {
+function inline(text: string) {
   return String(text)
     .split(/(\*\*[^*]+\*\*|`[^`]+`)/g)
     .filter((part) => part !== '')
@@ -150,7 +196,7 @@ function inline(text) {
     })
 }
 
-function ReportBlock(props) {
+function ReportBlock(props: { context: TuiContext; block: Block }) {
   const ctx = props.context
   const base = () => themeColor(ctx, (t) => t.text.base, '#d4d4d4')
   const muted = () => themeColor(ctx, (t) => t.text.muted, DIM)
@@ -198,16 +244,16 @@ function ReportBlock(props) {
   )
 }
 
-function ReportDialog(props) {
+function ReportDialog(props: { context: TuiContext; report: () => string | null; reload: () => void }) {
   const ctx = props.context
   const muted = () => themeColor(ctx, (t) => t.text.muted, DIM)
   const base = () => themeColor(ctx, (t) => t.text.base, '#d4d4d4')
   const rows = Math.max(8, Math.floor((ctx.renderer?.height ?? 30) * 0.6))
-  let scroll
+  let scroll: ScrollBox | undefined
 
   // Same keys as OpenCode's own scrollable dialogs; Esc is handled by the
   // dialog stack. useKeyboard registers per mount and cleans up on close.
-  const onKey = (key) => {
+  const onKey = (key: { name?: string }) => {
     if (key?.name === 'r') return props.reload()
     if (!scroll) return
     if (key?.name === 'up' || key?.name === 'k') return scroll.scrollBy(-1)
@@ -229,7 +275,7 @@ function ReportDialog(props) {
           {'↑↓ scroll · r refresh · esc close'}
         </text>
       </box>
-      <scrollbox ref={(r) => (scroll = r)} maxHeight={rows} scrollbarOptions={{ visible: false }}>
+      <scrollbox ref={(r: ScrollBox) => (scroll = r)} maxHeight={rows} scrollbarOptions={{ visible: false }}>
         <Show
           when={props.report()}
           fallback={<text fg={muted()}>Loading usage from the monitoring API…</text>}
@@ -248,8 +294,8 @@ function ReportDialog(props) {
   )
 }
 
-function openReport(context) {
-  const [report, setReport] = createSignal(null)
+function openReport(context: TuiContext) {
+  const [report, setReport] = createSignal<string | null>(null)
   const load = async () => {
     setReport(null)
     try {
@@ -266,10 +312,10 @@ function openReport(context) {
 
 export default {
   id: 'glm-quota-tui',
-  async setup(context) {
+  async setup(context: TuiContext) {
     // Solid signal so every refresh repaints the footer (stays live in long
     // sessions). 'solid-js' is mapped to OpenCode's own runtime for plugins.
-    const [data, setData] = createSignal(null)
+    const [data, setData] = createSignal<MeterState | null>(null)
 
     const refresh = async () => {
       try {
@@ -277,12 +323,12 @@ export default {
         if (!creds) return
         const endpoints = getEndpoints(creds.platform)
         const res = await queryEndpoint(endpoints, creds.token, 'quotaLimit')
-        setData(parseQuota(res.data))
+        setData({ authFailed: false, quota: parseQuota(res.data) })
       } catch (error) {
         // A rejected key will not fix itself: say so instead of showing the
         // last numbers forever. Anything else (timeout, 5xx) is transient —
         // keep the last good data until the next tick.
-        const status = error?.status
+        const status = (error as { status?: unknown } | null)?.status
         if (status === 401 || status === 403) setData({ authFailed: true })
       }
     }
@@ -291,18 +337,19 @@ export default {
     const timer = setInterval(refresh, REFRESH_MS)
     if (timer.unref) timer.unref()
 
-    const statusText = (d) => {
+    const statusText = (d: MeterState | null): string | null => {
       if (!d) return null
       if (d.authFailed) return 'z.ai | key rejected — run /connect'
-      const parts = []
+      const { fiveHour, weekly } = d.quota
+      const parts: string[] = []
 
       // 5h window: "3h 33m : 55%"; when full (100%), "5h : 100%"
-      const r5 = remainingPct(d.fiveHour)
+      const r5 = remainingPct(fiveHour)
       if (r5 !== null) {
         if (r5 >= 100) {
           parts.push('5h : 100%')
         } else {
-          const left = timeUntil(d.fiveHour?.resetsAt)
+          const left = timeUntil(fiveHour?.resetsAt)
           if (left !== null) {
             parts.push(`${formatDuration(left)} : ${Math.round(r5)}%`)
           } else {
@@ -312,9 +359,9 @@ export default {
       }
 
       // Weekly window: always time left + %, days first under-a-day falls back to h/m
-      const rw = remainingPct(d.weekly)
+      const rw = remainingPct(weekly)
       if (rw !== null) {
-        const left = timeUntil(d.weekly?.resetsAt)
+        const left = timeUntil(weekly?.resetsAt)
         const t = left === null ? null : formatDuration(left, 'short')
         parts.push(t ? `${t} : ${Math.round(rw)}%` : `${Math.round(rw)}%`)
       }
@@ -323,7 +370,7 @@ export default {
       return `z.ai | ${parts.join(' | ')}`
     }
 
-    const renderFooter = (gateOnModel, sessionID) => {
+    const renderFooter = (gateOnModel: boolean, sessionID?: string) => {
       // Reading context.ui.model.current() and the data() signal inside render
       // makes this repaint on model switches AND every 2-min refresh.
       // The prompt footer is also mounted on the home screen, where the
@@ -331,12 +378,12 @@ export default {
       // inside a real session (sessionID present) to avoid a duplicate.
       const model = gateOnModel ? context.ui.model.current() : null
       const d = data()
-      if (gateOnModel && (!sessionID || !isZaiProvider(model?.providerID))) {
+      if (gateOnModel && (!sessionID || detectPlatform(String(model?.providerID ?? '')) === null)) {
         return <text> </text>
       }
       const txt = statusText(d)
-      if (!txt) return <text> </text>
-      const fg = d.authFailed ? RED : colorFor(remainingPct(d.fiveHour))
+      if (!d || !txt) return <text> </text>
+      const fg = d.authFailed ? RED : colorFor(remainingPct(d.quota.fiveHour))
       return <text fg={fg}>{txt}</text>
     }
 

@@ -1,0 +1,18 @@
+{
+  // Type-checks the TUI part (src/tui.tsx) without emitting anything:
+  // OpenCode compiles it with its own Solid preset at load time. Run after
+  // `npm run build` — tui.tsx imports `../dist/tui-support.js`, which must
+  // resolve to the emitted declarations, so a wrong import path fails here.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "jsx": "preserve",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/tui.tsx", "types/tui-env.d.ts"]
+}

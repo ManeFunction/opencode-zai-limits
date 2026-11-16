@@ -17,6 +17,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc && tsc -p tsconfig.tui.json",
     "clean": "rm -rf dist"
   },
   "keywords": [
