@@ -20,203 +20,16 @@
  *   OpenCode v2 SQLite store (opencode.db) first, then auth.json, then env.
  */
 
-import { getPlatformName } from './api/platforms.js';
 import { getEndpoints } from './api/endpoints.js';
 import { queryEndpoint } from './api/client.js';
+import type { ApiResponse } from './api/client.js';
 import { getTimeWindow, getTimeWindowQueryParams } from './utils/time-window.js';
-import { formatProgressLine } from './utils/progress-bar.js';
-import {
-  MAIN_TITLE_PREFIX,
-  MCP_TOOL_LABELS,
-  ROW_EMOJI,
-  SECTION_HEADERS
-} from './utils/markdown-constants.js';
 import { createMarkdownError, GlmReportError, summarizeError } from './utils/error-formatter.js';
-import { asNumber, parseQuota } from './quota.js';
-import { formatClock, formatDuration, timeUntil } from './utils/duration.js';
-import type { Quota, QuotaWindow } from './quota.js';
+import { parseQuota } from './quota.js';
+import { formatReport } from './report/format.js';
+import type { UsageSection } from './report/format.js';
 import type { Credentials } from './utils/credentials.js';
 import { getCredentials } from './utils/credentials.js';
-
-// ============================================================================
-// OUTPUT FORMATTING
-// ============================================================================
-
-/**
- * Format number with thousand separators
- */
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US');
-}
-
-function formatPlanLevel(level: string | null): string {
-  if (!level) {
-    return '';
-  }
-  return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
-}
-
-function formatResetCell(resetAt: number | null): string {
-  const left = timeUntil(resetAt);
-  if (resetAt === null || left === null) {
-    return '—';
-  }
-  // Countdown plus the local clock time it lands on (Issue #34)
-  const overADay = left >= 24 * 60 * 60 * 1000;
-  return `${formatDuration(left)} (${formatClock(resetAt, overADay)})`;
-}
-
-function formatMarkdownTable(headers: string[], separator: string[], rows: string[][]): string {
-  const tableRows = rows.map((row) => `| ${row.join(' | ')} |`);
-  return [`| ${headers.join(' | ')} |`, `|${separator.join('|')}|`, ...tableRows].join('\n');
-}
-
-function formatMarkdownHeader(
-  platformName: string,
-  startTime: string,
-  endTime: string,
-  level: string | null,
-  credentials?: Credentials
-): string {
-  const title = level
-    ? `${MAIN_TITLE_PREFIX}${formatPlanLevel(level)}`
-    : '### 📊 Z.ai GLM Coding Plan';
-  const lines = [
-    title,
-    '',
-    `- **Platform**: ${platformName}`,
-    `- **Period**: ${startTime} → ${endTime}`
-  ];
-  if (credentials) {
-    lines.push(`- **Key**: ${credentials.label} (${credentials.source})`);
-  }
-  return lines.join('\n');
-}
-
-function formatUsed(window: QuotaWindow | null): string {
-  if (window?.used == null || window.total == null) {
-    return '—';
-  }
-  return `**${formatNumber(window.used)} / ${formatNumber(window.total)}**`;
-}
-
-function formatQuotaLimitsTable(quota: Quota): string {
-  const windows: [string, QuotaWindow | null, boolean][] = [
-    [`${ROW_EMOJI.TOKEN} 5h Credits`, quota.fiveHour, true],
-    [`${ROW_EMOJI.WEEKLY} Weekly Credits`, quota.weekly, true],
-    ...quota.other.map((w): [string, QuotaWindow, boolean] => [`Credits (unit ${w.unit ?? '?'} × ${w.number ?? '?'})`, w, true]),
-    [`${ROW_EMOJI.MCP} MCP (1 Month)`, quota.mcp, false]
-  ];
-  const rows = windows
-    .filter((entry): entry is [string, QuotaWindow, boolean] => entry[1] !== null)
-    .map(([label, window, resets]) => {
-      const percentage = window.percentage ?? 0;
-      return [
-        label,
-        window.percentage === null ? '—' : `${percentage.toFixed(1)}%`,
-        formatProgressLine('', percentage),
-        resets ? formatResetCell(window.resetsAt) : '—'
-      ];
-    });
-  return formatMarkdownTable(
-    ['Window', 'Usage', 'Progress', 'Resets In'],
-    ['--------', '------:', '----------', '-----------'],
-    rows.length > 0 ? rows : [['No quota data available', '—', '—', '—']]
-  );
-}
-
-function formatQuotaUsageTable(quota: Quota): string {
-  const rows: string[][] = [['💰 **5h Credits Used**', formatUsed(quota.fiveHour)]];
-  if (quota.weekly?.used != null && quota.weekly.total != null) {
-    rows.push(['📅 **Weekly Credits Used**', formatUsed(quota.weekly)]);
-  }
-  rows.push(['🔌 **MCP Used**', formatUsed(quota.mcp)]);
-  return formatMarkdownTable(['Metric', 'Value'], ['--------', '------:'], rows);
-}
-
-function formatMcpToolLabel(modelCode: string): string {
-  return Object.hasOwn(MCP_TOOL_LABELS, modelCode)
-    ? MCP_TOOL_LABELS[modelCode as keyof typeof MCP_TOOL_LABELS]
-    : modelCode;
-}
-
-function formatMcpBreakdownTable(quota: Quota): string {
-  const tools = quota.mcp?.tools ?? [];
-  const rows = tools.length
-    ? tools.map((tool) => [formatMcpToolLabel(tool.code), tool.usage === null ? '—' : formatNumber(tool.usage)])
-    : [['No MCP data available', '—']];
-  return formatMarkdownTable(['Tool', 'Count'], ['------', '------:'], rows);
-}
-
-function formatModelUsageTable(modelData: Record<string, unknown> | null, detailed: boolean): string {
-  const totalUsage = modelData?.totalUsage as Record<string, unknown> | undefined;
-  const models = (Array.isArray(totalUsage?.modelSummaryList) ? totalUsage.modelSummaryList : [])
-    .filter((model): model is Record<string, unknown> => typeof model === 'object' && model !== null)
-    .map((model) => ({
-      name: typeof model.modelName === 'string' ? model.modelName : 'Unknown',
-      tokens: asNumber(model.totalTokens)
-    }));
-  const modelTokenSum = models.reduce((sum, model) => sum + (model.tokens ?? 0), 0);
-  const rows: string[][] = [];
-  let calls = asNumber(totalUsage?.totalModelCallCount);
-  let tokens = asNumber(totalUsage?.totalTokensUsage);
-  // The API sometimes sends zero totals next to a non-empty per-model list.
-  // Trust the list then, and drop the call count it cannot back up.
-  if (!tokens && modelTokenSum > 0) {
-    tokens = modelTokenSum;
-    if (!calls) calls = null;
-  }
-  if (tokens !== null) {
-    rows.push(['🔢 Total Tokens (24h)', formatNumber(tokens)]);
-  }
-  if (calls !== null) {
-    rows.push(['📞 Total Calls', formatNumber(calls)]);
-  }
-  if (detailed) {
-    for (const model of models) {
-      rows.push([`🤖 ${model.name}`, model.tokens === null ? '—' : formatNumber(model.tokens)]);
-    }
-  }
-  return formatMarkdownTable(['Metric', 'Value'], ['--------', '------:'], rows.length > 0 ? rows : [['No model usage data available', '—']]);
-}
-
-function formatToolUsageTable(toolData: Record<string, unknown> | null): string {
-  const totalUsage = toolData?.totalUsage as Record<string, unknown> | undefined;
-  const counts: [string, number | null][] = [
-    [MCP_TOOL_LABELS['search-prime'], asNumber(totalUsage?.totalNetworkSearchCount)],
-    [MCP_TOOL_LABELS['web-reader'], asNumber(totalUsage?.totalWebReadMcpCount)],
-    [MCP_TOOL_LABELS.zread, asNumber(totalUsage?.totalZreadMcpCount)]
-  ];
-  const rows = counts
-    .filter(([, count]) => count !== null)
-    .map(([label, count]) => [label, formatNumber(count as number)]);
-  return formatMarkdownTable(['Tool', 'Count'], ['------', '------:'], rows.length > 0 ? rows : [['No tool usage data available', '—']]);
-}
-
-function unavailable(reason: string): string {
-  return `⚠️ Unavailable: ${reason}`;
-}
-
-function formatMarkdownOutput(
-  credentials: Credentials,
-  startTime: string,
-  endTime: string,
-  quota: Quota,
-  modelData: Record<string, unknown> | null,
-  toolData: Record<string, unknown> | null,
-  detailed: boolean,
-  failures: Record<string, string> = {}
-): string {
-  const platformName = getPlatformName(credentials.platform);
-  return [
-    formatMarkdownHeader(platformName, startTime, endTime, quota.level, credentials),
-    `${SECTION_HEADERS.QUOTA_LIMITS}\n\n${formatQuotaLimitsTable(quota)}`,
-    `${SECTION_HEADERS.QUOTA_USAGE}\n\n${formatQuotaUsageTable(quota)}`,
-    `${SECTION_HEADERS.MCP_BREAKDOWN}\n\n${formatMcpBreakdownTable(quota)}`,
-    `${SECTION_HEADERS.MODEL_USAGE}\n\n${failures.modelUsage ? unavailable(failures.modelUsage) : formatModelUsageTable(modelData, detailed)}`,
-    `${SECTION_HEADERS.TOOL_USAGE}\n\n${failures.toolUsage ? unavailable(failures.toolUsage) : formatToolUsageTable(toolData)}`
-  ].join('\n\n');
-}
 
 // ============================================================================
 // CREDENTIAL ERROR
@@ -247,8 +60,10 @@ function createCredentialError(): string {
  */
 async function queryAllUsage(credentials: Credentials, detailed: boolean): Promise<string> {
   const endpoints = getEndpoints(credentials.platform);
-  const { startTime, endTime } = getTimeWindow();
-  const queryParams = getTimeWindowQueryParams();
+  // One clock for the whole run, so the printed period, the query and the
+  // countdowns cannot straddle an hour boundary.
+  const now = new Date();
+  const queryParams = getTimeWindowQueryParams(now);
   const [quotaResult, modelResult, toolResult] = await Promise.allSettled([
     queryEndpoint(endpoints, credentials.token, 'quotaLimit'),
     queryEndpoint(endpoints, credentials.token, 'modelUsage', queryParams),
@@ -260,22 +75,27 @@ async function queryAllUsage(credentials: Credentials, detailed: boolean): Promi
   if (quotaResult.status === 'rejected') {
     throw quotaResult.reason;
   }
-  const quota = parseQuota(quotaResult.value.data);
-  const modelData = modelResult.status === 'fulfilled'
-    ? ((modelResult.value.data || modelResult.value) as Record<string, unknown>)
-    : null;
-  const toolData = toolResult.status === 'fulfilled'
-    ? ((toolResult.value.data || toolResult.value) as Record<string, unknown>)
-    : null;
-  const failures: Record<string, string> = {};
-  if (modelResult.status === 'rejected') failures.modelUsage = summarizeError(modelResult.reason);
-  if (toolResult.status === 'rejected') failures.toolUsage = summarizeError(toolResult.reason);
-  return formatMarkdownOutput(credentials, startTime, endTime, quota, modelData, toolData, detailed, failures);
+  return formatReport({
+    credentials,
+    window: getTimeWindow(now),
+    now: now.getTime(),
+    quota: parseQuota(quotaResult.value.data),
+    modelUsage: toSection(modelResult),
+    toolUsage: toSection(toolResult),
+    detailed
+  });
+}
+
+function toSection(result: PromiseSettledResult<ApiResponse>): UsageSection {
+  if (result.status === 'rejected') {
+    return { failed: summarizeError(result.reason) };
+  }
+  return { data: (result.value.data || result.value) as Record<string, unknown> };
 }
 
 /**
  * Execute the GLM quota query and return the Markdown report.
- * Testable core shared by the plugin tool executor and the test suite.
+ * Shared by the `glm_quota` tool and the TUI's `/glm-limits` dialog.
  * @param input - Tool input (`detailed` adds per-model usage breakdown)
  * @returns Markdown report or Markdown error message
  */
