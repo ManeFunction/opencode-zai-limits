@@ -9,7 +9,7 @@ for commit messages.
 ## [Unreleased]
 
 ### Fixed
-- `/glm-limits` and the `glm_quota` tool show API errors (bad key, rate limit, timeout, server
+- `/zai-limits` and the `opencode-zai-limits` tool show API errors (bad key, rate limit, timeout, server
   error) instead of an empty "No quota data available" report. The monitor API's HTTP 200
   `{"code":401,"success":false}` replies are now treated as errors too.
 - The footer meter shows `key rejected — run /connect` when the key is rejected, instead of keeping
@@ -21,6 +21,7 @@ for commit messages.
 - Response bodies are decoded as a UTF-8 stream, so non-ASCII text split across chunks is intact.
 
 ### Changed
+- Renamed the `/glm-limits` command to `/zai-limits` and the `glm_quota` tool to `opencode-zai-limits`.
 - The quota response is parsed once (`src/quota.ts`) and both the report and the meter read the
   result; the report renderer lives in `src/report/` as a pure function.
 - The TUI part is type-checked (`npm run typecheck`) and imports the server part through one

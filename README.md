@@ -2,18 +2,18 @@
 
 A credit meter and usage reporter for the [Z.ai GLM Coding Plan](https://z.ai/subscribe), living inside
 [OpenCode v2](https://opencode.ai). It draws your remaining credits into the status line right below the
-input field and gives you a `/glm-limits` command for the full report. Zero dependencies, zero tokens —
+input field and gives you a `/zai-limits` command for the full report. Zero dependencies, zero tokens —
 both the meter and the command talk to a plain monitoring endpoint, so they never burn the credits they show.
 
 ```
  z.ai | 3h 33m : 55% | 2d : 80%
 ```
 
-> **💰 Neither the footer meter nor `/glm-limits` spends credits or tokens.** Both are plain
+> **💰 Neither the footer meter nor `/zai-limits` spends credits or tokens.** Both are plain
 > monitoring GETs made by the plugin itself — no agent, no model call. The meter polls in the
-> background; `/glm-limits` is a TUI command that fetches the report and opens it in a dialog, so
+> background; `/zai-limits` is a TUI command that fetches the report and opens it in a dialog, so
 > nothing is sent to a model. (The original repo's `/glm_quota` is a Markdown command that drives a
-> subagent, so every run of it costs a model call; this plugin has no such command.) The `glm_quota`
+> subagent, so every run of it costs a model call; this plugin has no such command.) The `opencode-zai-limits`
 > tool is still registered for agents that want to check the quota on their own — only that path
 > involves a model, because an agent is already running.
 
@@ -29,9 +29,9 @@ showing old numbers.
 - **Footer status line** — remaining 5h and weekly credits with reset countdown, refreshed every
   2 minutes through a Solid signal, so it stays live in long sessions. Gated to Z.AI/Zhipu models
   inside a session, always shown on the home screen.
-- **Free to watch, free to ask** — neither the footer meter nor `/glm-limits` uses any credits or
+- **Free to watch, free to ask** — neither the footer meter nor `/zai-limits` uses any credits or
   tokens: both only issue monitoring GETs, with no agent and no model in the loop.
-- **`/glm-limits` command** — the full report in a dialog: credit limits per window with progress
+- **`/zai-limits` command** — the full report in a dialog: credit limits per window with progress
   bars, credits used, MCP tool breakdown, 24h model usage per model and tool calls. It is a TUI
   command (also in the command palette as *GLM credit limits*), so it runs instantly and never
   starts an agent.
@@ -68,18 +68,18 @@ Not published to npm yet — install it from a clone of this repository.
       `~/.config/opencode/plugins/opencode-glm-limits/` containing `package.json`, `dist/` and `src/`.
     - **Upgrading from an earlier setup?** Delete `~/.config/opencode/commands/glm-limits.md` and
       `~/.config/opencode/agents/glm-quota-exec.md` if you have them. The old Markdown command ran a
-      subagent (a model call per run) and would clash with the new built-in `/glm-limits`.
+      subagent (a model call per run) and would clash with the new built-in `/zai-limits`.
     - **Coming from `opencode-glm-quota`?** Delete `~/.config/opencode/plugins/opencode-glm-quota/`.
-      It registers the same plugin id and the same `glm_quota` tool, so the two would collide.
+      Keeping both would give you two footer meters and two quota tools side by side.
     - Restart OpenCode. `opencode plugin list` should show the local plugin, the meter appears in the
-      status line whenever a Z.AI model is selected, and `/glm-limits` shows up in the slash menu.
+      status line whenever a Z.AI model is selected, and `/zai-limits` shows up in the slash menu.
 
 2) **What gets installed where**
 
     | Piece | Location | What it is |
     |---|---|---|
-    | Plugin (server part) | `~/.config/opencode/plugins/opencode-glm-limits/` | registers the `glm_quota` tool for agents |
-    | TUI part | `src/tui.tsx` inside the plugin folder | the footer meter and the `/glm-limits` command (compiled by OpenCode at load) |
+    | Plugin (server part) | `~/.config/opencode/plugins/opencode-glm-limits/` | registers the `opencode-zai-limits` tool for agents |
+    | TUI part | `src/tui.tsx` inside the plugin folder | the footer meter and the `/zai-limits` command (compiled by OpenCode at load) |
 
     That's all: no command or agent files to copy.
 
@@ -92,7 +92,7 @@ discovers plugin folders on its own.
   window (time to reset, remaining), second is the weekly one (days when ≥ 24h, hours and minutes
   under a day; always shown, even when full). The 5-hour segment becomes `5h : 100%` when the window
   is fully recovered.
-- **`/glm-limits`** (or *GLM credit limits* in the command palette) opens the detailed report in a
+- **`/zai-limits`** (or *GLM credit limits* in the command palette) opens the detailed report in a
   dialog — free, no model call. Scroll with `↑`/`↓` (`j`/`k`, PgUp/PgDn), `r` refreshes, `Esc` closes.
   The report looks like this (shown here as the Markdown it is built from):
 
@@ -114,7 +114,7 @@ discovers plugin folders on its own.
 | 📅 **Weekly Credits Used** | **767 / 10,000** |
 ```
 
-- The `glm_quota` tool is also exposed to agents and Code Mode, so a running agent can check the quota
+- The `opencode-zai-limits` tool is also exposed to agents and Code Mode, so a running agent can check the quota
   itself. That is the only path where a model is involved: the HTTP request is still free, but the
   report lands in the agent's context like any tool result, so it counts toward that agent's tokens.
 
@@ -122,7 +122,7 @@ discovers plugin folders on its own.
 
 - The 5-hour window on the Coding Plan is *rolling*: credits come back 5 hours after each consumption,
   so right after the nominal reset the meter may still show 99% until the last old usage ages out.
-- The meter polls a monitoring endpoint every 2 minutes per OpenCode TUI process, and `/glm-limits`
+- The meter polls a monitoring endpoint every 2 minutes per OpenCode TUI process, and `/zai-limits`
   makes three requests when you open or refresh it. All of them are plain GETs — no model
   involvement, so neither consumes credits or tokens.
 - The monitor endpoints are undocumented on purpose by Z.ai; they are the same ones the official
@@ -130,7 +130,7 @@ discovers plugin folders on its own.
 
 ## How it works
 
-The server part registers the `glm_quota` tool for agents. Its credential module finds your GLM Coding Plan key
+The server part registers the `opencode-zai-limits` tool for agents. Its credential module finds your GLM Coding Plan key
 (the `zai` / `zhipu` entries only — it never touches credentials of other providers) in OpenCode's
 SQLite store, opened `--readonly` through the `sqlite3` CLI with a 5-second timeout, falling back to
 the v1 `auth.json` and then environment variables. Requests go to `https://api.z.ai` or
@@ -142,7 +142,7 @@ The TUI part (`src/tui.tsx`) is a second plugin part compiled by OpenCode's own 
 It keeps the last quota snapshot in a Solid signal, refreshed every 2 minutes, and renders one
 `<text>` into the `prompt.footer.status` slot (the line below the input field) and `home.footer.status`.
 
-It also registers `/glm-limits` as a TUI command — a keymap layer with a `slash` name, the same
+It also registers `/zai-limits` as a TUI command — a keymap layer with a `slash` name, the same
 mechanism OpenCode's built-in `/stats` and `/plugins` use. Running it calls the server part's
 report builder (`executeGlmQuota`) directly and draws the result in a dialog. A Markdown command
 would instead be a prompt sent to an agent, which is why the earlier version cost a model call per
@@ -162,10 +162,10 @@ npm run clean
 
 | Path | What it is |
 |---|---|
-| `src/index.ts` | server part: the `glm_quota` tool and `executeGlmQuota` (fetch + report) |
+| `src/index.ts` | server part: the `opencode-zai-limits` tool and `executeGlmQuota` (fetch + report) |
 | `src/quota.ts` | `parseQuota`: the quota response as a typed snapshot (5h, weekly, MCP) |
 | `src/report/` | the Markdown report, a pure function of already-fetched data |
-| `src/tui.tsx` | TUI part: the footer meter and the `/glm-limits` dialog (Solid JSX, compiled by OpenCode) |
+| `src/tui.tsx` | TUI part: the footer meter and the `/zai-limits` dialog (Solid JSX, compiled by OpenCode) |
 | `src/tui-support.ts` | the one module `tui.tsx` imports from `dist/` |
 | `src/api/` | HTTPS client, endpoints, platform detection |
 | `src/utils/` | credentials, auth paths, durations, formatting, time windows |

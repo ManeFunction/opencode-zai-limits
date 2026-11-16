@@ -1,5 +1,5 @@
 /**
- * TUI part of the glm-quota plugin (slim variant — no SDK imports).
+ * TUI part of the opencode-zai-limits plugin (slim variant — no SDK imports).
  *
  * Renders a credit meter into the footer status row:
  * - prompt.footer.status = the line below the input field, visible only while
@@ -13,9 +13,9 @@
  *   >= 24h, hours+minutes under a day
  * Percentages are REMAINING, colored green > 50 / yellow > 20 / red otherwise.
  *
- * Also registers the `/glm-limits` slash command (and a command-palette
+ * Also registers the `/zai-limits` slash command (and a command-palette
  * entry). It runs right here in the TUI: it builds the same Markdown report as
- * the `glm_quota` tool and shows it in a dialog. No agent, no model call, so
+ * the `opencode-zai-limits` tool and shows it in a dialog. No agent, no model call, so
  * it spends no credits or tokens. The pattern (a keymap layer registered from
  * an `app` slot, `ui.dialog.show`) matches OpenCode's built-in `/stats` and
  * `/plugins` commands.
@@ -123,7 +123,7 @@ function colorFor(pct: number | null): string {
 }
 
 // ============================================================================
-// /glm-limits REPORT DIALOG
+// /zai-limits REPORT DIALOG
 // ============================================================================
 
 // Reads a theme token defensively: the plugin theme shape is not a published
@@ -269,7 +269,7 @@ function ReportDialog(props: { context: TuiContext; report: () => string | null;
     <box flexDirection="column" paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1}>
       <box flexDirection="row" justifyContent="space-between" paddingBottom={1}>
         <text fg={base()} wrapMode="none">
-          <b>/glm-limits</b>
+          <b>/zai-limits</b>
         </text>
         <text fg={muted()} wrapMode="none">
           {'↑↓ scroll · r refresh · esc close'}
@@ -299,7 +299,7 @@ function openReport(context: TuiContext) {
   const load = async () => {
     setReport(null)
     try {
-      // Same report as the glm_quota tool (detailed: per-model rows included).
+      // Same report as the opencode-zai-limits tool (detailed: per-model rows included).
       setReport(await executeGlmQuota({ detailed: true }))
     } catch (error) {
       setReport(`### ⚠️ Error\n\n${error instanceof Error ? error.message : String(error)}`)
@@ -311,7 +311,7 @@ function openReport(context: TuiContext) {
 }
 
 export default {
-  id: 'glm-quota-tui',
+  id: 'opencode-zai-limits-tui',
   async setup(context: TuiContext) {
     // Solid signal so every refresh repaints the footer (stays live in long
     // sessions). 'solid-js' is mapped to OpenCode's own runtime for plugins.
@@ -396,7 +396,7 @@ export default {
       render: () => renderFooter(false),
     })
 
-    // `/glm-limits`: a TUI command, not a Markdown command, so no agent runs
+    // `/zai-limits`: a TUI command, not a Markdown command, so no agent runs
     // and nothing is sent to a model. The keymap layer is registered from an
     // `app` slot (it needs a reactive owner), like OpenCode's built-in /stats.
     context.ui.slot({
@@ -411,7 +411,7 @@ export default {
               description: 'Z.ai GLM Coding Plan usage report (no model call, no credits)',
               group: 'System',
               palette: true,
-              slash: { name: 'glm-limits' },
+              slash: { name: 'zai-limits' },
               run() {
                 openReport(context)
               },

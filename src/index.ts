@@ -11,7 +11,7 @@
  *   and this plugin stays zero-dependency. V1-style plugin functions do
  *   not load in OpenCode V2 — keep this shape.
  * - The tool is registered through `ctx.tool.transform` under the name
- *   `glm_quota`, so agents can check the quota themselves. The `/glm-limits`
+ *   `opencode-zai-limits`, so agents can check the quota themselves. The `/zai-limits`
  *   slash command does not go through it: the TUI part (`tui.tsx`) calls
  *   `executeGlmQuota` directly and shows the report in a dialog, with no
  *   agent and no model call.
@@ -95,7 +95,7 @@ function toSection(result: PromiseSettledResult<ApiResponse>): UsageSection {
 
 /**
  * Execute the GLM quota query and return the Markdown report.
- * Shared by the `glm_quota` tool and the TUI's `/glm-limits` dialog.
+ * Shared by the `opencode-zai-limits` tool and the TUI's `/zai-limits` dialog.
  * @param input - Tool input (`detailed` adds per-model usage breakdown)
  * @returns Markdown report or Markdown error message
  */
@@ -138,11 +138,11 @@ interface GlmLimitsPlugin {
 // identity function (returns its argument), so the SDK would only add
 // TypeScript types at a cost of a ~180 MB dependency tree. Keep the shape.
 export default {
-  id: 'glm-quota',
+  id: 'opencode-zai-limits',
   async setup(ctx) {
     await ctx.tool.transform((editor) => {
       editor.add({
-        name: 'glm_quota',
+        name: 'opencode-zai-limits',
         description:
           'Query Z.ai GLM Coding Plan usage statistics including quota limits, model usage, and MCP tool usage',
         input: {
