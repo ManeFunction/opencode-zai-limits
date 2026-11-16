@@ -173,20 +173,31 @@ function formatMcpBreakdownTable(quota: Quota): string {
 
 function formatModelUsageTable(modelData: Record<string, unknown> | null, detailed: boolean): string {
   const totalUsage = modelData?.totalUsage as Record<string, unknown> | undefined;
+  const models = (Array.isArray(totalUsage?.modelSummaryList) ? totalUsage.modelSummaryList : [])
+    .filter((model): model is Record<string, unknown> => typeof model === 'object' && model !== null)
+    .map((model) => ({
+      name: typeof model.modelName === 'string' ? model.modelName : 'Unknown',
+      tokens: asNumber(model.totalTokens)
+    }));
+  const modelTokenSum = models.reduce((sum, model) => sum + (model.tokens ?? 0), 0);
   const rows: string[][] = [];
-  const calls = asNumber(totalUsage?.totalModelCallCount);
-  const tokens = asNumber(totalUsage?.totalTokensUsage);
+  let calls = asNumber(totalUsage?.totalModelCallCount);
+  let tokens = asNumber(totalUsage?.totalTokensUsage);
+  // The API sometimes sends zero totals next to a non-empty per-model list.
+  // Trust the list then, and drop the call count it cannot back up.
+  if (!tokens && modelTokenSum > 0) {
+    tokens = modelTokenSum;
+    if (!calls) calls = null;
+  }
   if (tokens !== null) {
     rows.push(['🔢 Total Tokens (24h)', formatNumber(tokens)]);
   }
   if (calls !== null) {
     rows.push(['📞 Total Calls', formatNumber(calls)]);
   }
-  if (detailed && Array.isArray(totalUsage?.modelSummaryList)) {
-    for (const model of totalUsage.modelSummaryList as Record<string, unknown>[]) {
-      const name = typeof model.modelName === 'string' ? model.modelName : 'Unknown';
-      const modelTokens = asNumber(model.totalTokens);
-      rows.push([`🤖 ${name}`, modelTokens === null ? '—' : formatNumber(modelTokens)]);
+  if (detailed) {
+    for (const model of models) {
+      rows.push([`🤖 ${model.name}`, model.tokens === null ? '—' : formatNumber(model.tokens)]);
     }
   }
   return formatMarkdownTable(['Metric', 'Value'], ['--------', '------:'], rows.length > 0 ? rows : [['No model usage data available', '—']]);
