@@ -27,6 +27,7 @@ import { getTimeWindow, getTimeWindowQueryParams } from './utils/time-window.js'
 import { formatProgressLine } from './utils/progress-bar.js';
 import {
   MAIN_TITLE_PREFIX,
+  MCP_TOOL_LABELS,
   ROW_EMOJI,
   SECTION_HEADERS
 } from './utils/markdown-constants.js';
@@ -129,21 +130,14 @@ function formatQuotaUsageTable(quota: Quota): string {
   if (quota.weekly?.used != null && quota.weekly.total != null) {
     rows.push(['📅 **Weekly Credits Used**', formatUsed(quota.weekly)]);
   }
-  rows.push(['🔌 **MCP Used**', quota.mcp?.used == null || quota.mcp.total == null ? '—' : `**${quota.mcp.used} / ${quota.mcp.total}**`]);
+  rows.push(['🔌 **MCP Used**', formatUsed(quota.mcp)]);
   return formatMarkdownTable(['Metric', 'Value'], ['--------', '------:'], rows);
 }
 
 function formatMcpToolLabel(modelCode: string): string {
-  if (modelCode === 'search-prime') {
-    return '🔍 Network Searches';
-  }
-  if (modelCode === 'web-reader') {
-    return '🌐 Web Reads';
-  }
-  if (modelCode === 'zread') {
-    return '📖 ZRead Calls';
-  }
-  return modelCode;
+  return Object.hasOwn(MCP_TOOL_LABELS, modelCode)
+    ? MCP_TOOL_LABELS[modelCode as keyof typeof MCP_TOOL_LABELS]
+    : modelCode;
 }
 
 function formatMcpBreakdownTable(quota: Quota): string {
@@ -189,9 +183,9 @@ function formatModelUsageTable(modelData: Record<string, unknown> | null, detail
 function formatToolUsageTable(toolData: Record<string, unknown> | null): string {
   const totalUsage = toolData?.totalUsage as Record<string, unknown> | undefined;
   const counts: [string, number | null][] = [
-    ['🔍 Network Searches', asNumber(totalUsage?.totalNetworkSearchCount)],
-    ['🌐 Web Reads', asNumber(totalUsage?.totalWebReadMcpCount)],
-    ['🎭 ZRead Calls', asNumber(totalUsage?.totalZreadMcpCount)]
+    [MCP_TOOL_LABELS['search-prime'], asNumber(totalUsage?.totalNetworkSearchCount)],
+    [MCP_TOOL_LABELS['web-reader'], asNumber(totalUsage?.totalWebReadMcpCount)],
+    [MCP_TOOL_LABELS.zread, asNumber(totalUsage?.totalZreadMcpCount)]
   ];
   const rows = counts
     .filter(([, count]) => count !== null)

@@ -29,6 +29,16 @@ export const ROW_EMOJI = {
   MCP: '🔌',
 } as const
 
+/**
+ * MCP tool labels, keyed by the API's `modelCode`. Shared by the MCP
+ * breakdown and the 24h tool usage tables so the two cannot drift.
+ */
+export const MCP_TOOL_LABELS = {
+  'search-prime': '🔍 Network Searches',
+  'web-reader': '🌐 Web Reads',
+  zread: '📖 ZRead Calls',
+} as const satisfies Record<string, string>
+
 /** Error format markers */
 export const ERROR_FORMAT = {
   TITLE_PREFIX: '### ⚠️ ',
