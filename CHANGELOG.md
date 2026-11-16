@@ -8,6 +8,30 @@ for commit messages.
 
 ## [Unreleased]
 
+### Fixed
+- `/glm-limits` and the `glm_quota` tool show API errors (bad key, rate limit, timeout, server
+  error) instead of an empty "No quota data available" report. The monitor API's HTTP 200
+  `{"code":401,"success":false}` replies are now treated as errors too.
+- The footer meter shows `key rejected — run /connect` when the key is rejected, instead of keeping
+  the last numbers forever.
+- The weekly window could be shown as "5h Window" when the 5-hour window was missing; that row and
+  the leftover 40M token fallback behind it are gone.
+- 24h model usage no longer reads zero when the API's totals are zero but its per-model list is not.
+- ZRead had two different icons in two tables; MCP usage numbers get thousands separators.
+- Response bodies are decoded as a UTF-8 stream, so non-ASCII text split across chunks is intact.
+
+### Changed
+- The quota response is parsed once (`src/quota.ts`) and both the report and the meter read the
+  result; the report renderer lives in `src/report/` as a pure function.
+- The TUI part is type-checked (`npm run typecheck`) and imports the server part through one
+  module, `dist/tui-support.js`. `prepublishOnly` rebuilds and type-checks before publishing.
+- README: the home screen footer always shows the meter; `sqlite3` 3.33+ is required; remove an
+  old `opencode-glm-quota` plugin folder when switching.
+
+### Removed
+- Dead code from the fork: unused formatters, constants, the `ZHIPU_DEV` endpoints and
+  `reset-timer.ts`.
+
 ## [0.1.0] - 2026-11-16
 Initial release. Derived from [guyinwonder168/opencode-glm-quota](https://github.com/guyinwonder168/opencode-glm-quota)
 (as of [PR #52](https://github.com/guyinwonder168/opencode-glm-quota/pull/52) by @itelyatnikov80,

@@ -19,13 +19,16 @@ both the meter and the command talk to a plain monitoring endpoint, so they neve
 
 The first number pair is the 5-hour rolling window (time to reset, remaining), the second is the weekly
 window. The whole line turns from green to yellow to red as the 5h credits drain, and flips to
-`5h : 100%` when the window is fully recovered. It appears only while a Z.AI/Zhipu model is selected,
-so it stays out of the way when you switch providers.
+`5h : 100%` when the window is fully recovered. Inside a session it appears only while a Z.AI/Zhipu
+model is selected, so it stays out of the way when you switch providers; the home screen footer always
+shows it. If the API rejects your key, the meter says `z.ai | key rejected — run /connect` instead of
+showing old numbers.
 
 ## Features
 
 - **Footer status line** — remaining 5h and weekly credits with reset countdown, refreshed every
-  2 minutes through a Solid signal, so it stays live in long sessions. Gated to Z.AI/Zhipu models.
+  2 minutes through a Solid signal, so it stays live in long sessions. Gated to Z.AI/Zhipu models
+  inside a session, always shown on the home screen.
 - **Free to watch, free to ask** — neither the footer meter nor `/glm-limits` uses any credits or
   tokens: both only issue monitoring GETs, with no agent and no model in the loop.
 - **`/glm-limits` command** — the full report in a dialog: credit limits per window with progress
@@ -40,15 +43,17 @@ so it stays out of the way when you switch providers.
   opened read-only through the `sqlite3` CLI), with `auth.json` and `ZAI_API_KEY` / `ZHIPU_API_KEY`
   as fallbacks. Works with both the Global (`api.z.ai`) and China (`open.bigmodel.cn`) platforms.
 - **Coded conservatively** — the meter calls the same three fixed monitor endpoints with the same
-  auth header as Z.ai's own tooling; token values are scrubbed from error messages; no agent or
-  prompt is involved in reporting.
+  auth header as Z.ai's own tooling; API failures (a bad key, rate limits, timeouts) are shown as
+  such, with the key scrubbed from the message; no agent or prompt is involved in reporting.
 
 ## Requirements
 
 - [OpenCode](https://opencode.ai) v2 (the one with `opencode.db`).
 - A [GLM Coding Plan](https://z.ai/subscribe) subscription with its API key connected in OpenCode
   (`/connect` → Z.AI Coding Plan / Z.AI / Zhipu).
-- The `sqlite3` command-line tool (ships with macOS and most Linux distros).
+- The `sqlite3` command-line tool, version 3.33 or newer (it needs `-json`; ships with macOS and
+  most Linux distros). With an older `sqlite3` the key lookup in `opencode.db` fails silently and
+  only `auth.json` and the environment variables are tried.
 
 ## Installation
 
@@ -64,6 +69,8 @@ Not published to npm yet — install it from a clone of this repository.
     - **Upgrading from an earlier setup?** Delete `~/.config/opencode/commands/glm-limits.md` and
       `~/.config/opencode/agents/glm-quota-exec.md` if you have them. The old Markdown command ran a
       subagent (a model call per run) and would clash with the new built-in `/glm-limits`.
+    - **Coming from `opencode-glm-quota`?** Delete `~/.config/opencode/plugins/opencode-glm-quota/`.
+      It registers the same plugin id and the same `glm_quota` tool, so the two would collide.
     - Restart OpenCode. `opencode plugin list` should show the local plugin, the meter appears in the
       status line whenever a Z.AI model is selected, and `/glm-limits` shows up in the slash menu.
 
@@ -127,8 +134,9 @@ The server part registers the `glm_quota` tool for agents. Its credential module
 (the `zai` / `zhipu` entries only — it never touches credentials of other providers) in OpenCode's
 SQLite store, opened `--readonly` through the `sqlite3` CLI with a 5-second timeout, falling back to
 the v1 `auth.json` and then environment variables. Requests go to `https://api.z.ai` or
-`https://open.bigmodel.cn` over HTTPS with the key in the `Authorization` header; the key is scrubbed
-from every error message before it reaches the screen.
+`https://open.bigmodel.cn` over HTTPS with the key in the `Authorization` header. The quota response is
+parsed once into a typed snapshot (`src/quota.ts`) that both the report and the meter read. When a
+request fails, the report shows the error (the key scrubbed from it) instead of empty tables.
 
 The TUI part (`src/tui.tsx`) is a second plugin part compiled by OpenCode's own Solid/OpenTUI loader.
 It keeps the last quota snapshot in a Solid signal, refreshed every 2 minutes, and renders one
@@ -148,15 +156,20 @@ plugin ships without the SDK and its ~180 MB dependency tree.
 ```bash
 npm install --ignore-scripts
 npm run build        # dist/ (server part; tui.tsx ships as source, OpenCode compiles it)
+npm run typecheck    # build, then type-check tui.tsx against dist/ declarations
 npm run clean
 ```
 
 | Path | What it is |
 |---|---|
-| `src/index.ts` | server part: tool, credentials wiring, Markdown report |
+| `src/index.ts` | server part: the `glm_quota` tool and `executeGlmQuota` (fetch + report) |
+| `src/quota.ts` | `parseQuota`: the quota response as a typed snapshot (5h, weekly, MCP) |
+| `src/report/` | the Markdown report, a pure function of already-fetched data |
 | `src/tui.tsx` | TUI part: the footer meter and the `/glm-limits` dialog (Solid JSX, compiled by OpenCode) |
+| `src/tui-support.ts` | the one module `tui.tsx` imports from `dist/` |
 | `src/api/` | HTTPS client, endpoints, platform detection |
-| `src/utils/` | credentials, auth paths, formatting, time windows |
+| `src/utils/` | credentials, auth paths, durations, formatting, time windows |
+| `types/`, `tsconfig.tui.json` | type-checking setup for `tui.tsx` (no runtime role) |
 
 ## Credits
 
