@@ -31,8 +31,8 @@
  *   preset to @opentui/solid at load time).
  * - Reuses the audited server-part modules for credentials (opencode.db via
  *   readonly sqlite3 CLI) and the HTTPS client (fixed api.z.ai hosts only).
- * - Raw API responses carry type "CREDIT_LIMIT" (legacy "TOKENS_LIMIT") with
- *   unit 3 x number 5 = 5h window and unit 6 x number 1 = weekly window.
+ * - The raw quota response is read through `parseQuota` (src/quota.ts), the
+ *   same model the report uses, so the two cannot disagree on the windows.
  */
 
 import { createSignal, For, Show } from 'solid-js'
@@ -42,6 +42,7 @@ import * as opentui from '@opentui/solid'
 import { getCredentials } from '../dist/utils/credentials.js'
 import { getEndpoints } from '../dist/api/endpoints.js'
 import { queryEndpoint } from '../dist/api/client.js'
+import { parseQuota } from '../dist/quota.js'
 import { executeGlmQuota } from '../dist/index.js'
 
 const REFRESH_MS = 2 * 60 * 1000
@@ -62,18 +63,9 @@ function isZaiProvider(providerID) {
   )
 }
 
-function isQuotaWindow(limit, unit, number) {
-  const type = limit?.type
-  return (
-    (type === 'CREDIT_LIMIT' || type === 'TOKENS_LIMIT') &&
-    limit?.unit === unit &&
-    limit?.number === number
-  )
-}
-
-function remainingPct(limit) {
-  if (!limit || typeof limit.percentage !== 'number') return null
-  return Math.max(0, Math.min(100, 100 - limit.percentage))
+function remainingPct(window) {
+  if (!window || window.percentage === null) return null
+  return Math.max(0, Math.min(100, 100 - window.percentage))
 }
 
 function fmtHm(ms) {
@@ -304,11 +296,7 @@ export default {
         if (!creds) return
         const endpoints = getEndpoints(creds.platform)
         const res = await queryEndpoint(endpoints, creds.token, 'quotaLimit')
-        const limits = res?.data?.limits ?? []
-        setData({
-          fiveHour: limits.find((l) => isQuotaWindow(l, 3, 5)) ?? null,
-          weekly: limits.find((l) => isQuotaWindow(l, 6, 1)) ?? null,
-        })
+        setData(parseQuota(res.data))
       } catch (error) {
         // A rejected key will not fix itself: say so instead of showing the
         // last numbers forever. Anything else (timeout, 5xx) is transient —
@@ -333,7 +321,7 @@ export default {
         if (r5 >= 100) {
           parts.push('5h : 100%')
         } else {
-          const left = timeLeft(d.fiveHour?.nextResetTime)
+          const left = timeLeft(d.fiveHour?.resetsAt)
           if (left !== null) {
             parts.push(`${fmtHm(left)} : ${Math.round(r5)}%`)
           } else {
@@ -345,7 +333,7 @@ export default {
       // Weekly window: always time left + %, days first under-a-day falls back to h/m
       const rw = remainingPct(d.weekly)
       if (rw !== null) {
-        const left = timeLeft(d.weekly?.nextResetTime)
+        const left = timeLeft(d.weekly?.resetsAt)
         const t = left === null ? null : fmtLong(left)
         parts.push(t ? `${t} : ${Math.round(rw)}%` : `${Math.round(rw)}%`)
       }

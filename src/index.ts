@@ -31,93 +31,10 @@ import {
   SECTION_HEADERS
 } from './utils/markdown-constants.js';
 import { createMarkdownError, GlmReportError, summarizeError } from './utils/error-formatter.js';
-import {
-  FIVE_HOUR_TOKEN_LIMIT_LABEL,
-  getTokenLimitLabel
-} from './utils/token-limits.js';
+import { asNumber, parseQuota } from './quota.js';
+import type { Quota, QuotaWindow } from './quota.js';
 import type { Credentials } from './utils/credentials.js';
 import { getCredentials } from './utils/credentials.js';
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const MCP_LIMIT_LABEL = 'MCP usage(1 Month)';
-const TOKEN_LIMIT_TYPE = 'TOKENS_LIMIT';
-const CREDIT_LIMIT_TYPE = 'CREDIT_LIMIT';
-const TIME_LIMIT_TYPE = 'TIME_LIMIT';
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-/**
- * Quota limit item from API response
- */
-interface QuotaLimitItem {
-  type: string;
-  rawType?: string;
-  unit?: number;
-  number?: number;
-  percentage: number;
-  currentValue?: number;
-  total?: number;
-  usageDetails?: Record<string, unknown>;
-  nextResetTime?: number; // Unix timestamp in milliseconds
-}
-
-/**
- * Processed quota limit response
- */
-interface ProcessedQuotaLimit {
-  limits?: QuotaLimitItem[];
-  [key: string]: unknown;
-}
-
-// ============================================================================
-// RESPONSE PROCESSING
-// ============================================================================
-
-/**
- * Process quota limit response
- * @param data - Raw API response
- * @returns Processed response with human-readable types
- */
-function processQuotaLimit(data: unknown): ProcessedQuotaLimit {
-  const result = { ...(data as Record<string, unknown>) } as ProcessedQuotaLimit;
-  if (result.limits && Array.isArray(result.limits)) {
-    result.limits = result.limits.map((item) => {
-      if (typeof item === 'object' && item !== null) {
-        const limit = item as unknown as Record<string, unknown>;
-        if (limit.type === TOKEN_LIMIT_TYPE || limit.type === CREDIT_LIMIT_TYPE) {
-          return {
-            type: getTokenLimitLabel(limit),
-            rawType: limit.type,
-            unit: typeof limit.unit === 'number' ? limit.unit : undefined,
-            number: typeof limit.number === 'number' ? limit.number : undefined,
-            percentage: typeof limit.percentage === 'number' ? limit.percentage : 0,
-            currentValue: typeof limit.currentValue === 'number' ? limit.currentValue : undefined,
-            total: typeof limit.usage === 'number' ? limit.usage : undefined,
-            nextResetTime: typeof limit.nextResetTime === 'number' ? limit.nextResetTime : undefined
-          };
-        }
-        if (limit.type === TIME_LIMIT_TYPE) {
-          return {
-            type: MCP_LIMIT_LABEL,
-            percentage: typeof limit.percentage === 'number' ? limit.percentage : 0,
-            currentValue: typeof limit.currentValue === 'number' ? limit.currentValue : undefined,
-            total: typeof limit.usage === 'number' ? limit.usage : undefined,
-            usageDetails: (limit.usageDetails !== null && typeof limit.usageDetails === 'object'
-              ? limit.usageDetails
-              : undefined) as Record<string, unknown> | undefined
-          };
-        }
-      }
-      return item;
-    });
-  }
-  return result;
-}
 
 // ============================================================================
 // OUTPUT FORMATTING
@@ -130,22 +47,14 @@ function formatNumber(num: number): string {
   return num.toLocaleString('en-US');
 }
 
-/**
- * Format MCP tool details as readable lines
- */
-function asNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function formatPlanLevel(level: string | undefined): string {
+function formatPlanLevel(level: string | null): string {
   if (!level) {
     return '';
   }
   return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
 }
 
-function formatResetCell(resetTime: number | undefined): string {
-  const resetAt = asNumber(resetTime);
+function formatResetCell(resetAt: number | null): string {
   if (resetAt === null) {
     return '—';
   }
@@ -182,7 +91,7 @@ function formatMarkdownHeader(
   platformName: string,
   startTime: string,
   endTime: string,
-  level: string | undefined,
+  level: string | null,
   credentials?: Credentials
 ): string {
   const title = level
@@ -200,52 +109,44 @@ function formatMarkdownHeader(
   return lines.join('\n');
 }
 
-function formatQuotaWindowLabel(type: string): string {
-  if (type === FIVE_HOUR_TOKEN_LIMIT_LABEL) {
-    return `${ROW_EMOJI.TOKEN} 5h Credits`;
+function formatUsed(window: QuotaWindow | null): string {
+  if (window?.used == null || window.total == null) {
+    return '—';
   }
-  if (type === 'Token usage(Weekly)') {
-    return `${ROW_EMOJI.WEEKLY} Weekly Credits`;
-  }
-  if (type === MCP_LIMIT_LABEL) {
-    return `${ROW_EMOJI.MCP} MCP (1 Month)`;
-  }
-  return type;
+  return `**${formatNumber(window.used)} / ${formatNumber(window.total)}**`;
 }
 
-function formatQuotaLimitsTable(quotaData: ProcessedQuotaLimit | null): string {
-  const rows = quotaData?.limits?.length
-    ? quotaData.limits.map((limit) => {
-        const percentage = typeof limit.percentage === 'number' ? limit.percentage : 0;
-        return [
-          formatQuotaWindowLabel(limit.type || 'Unknown'),
-          `${percentage.toFixed(1)}%`,
-          formatProgressLine(limit.type || 'Unknown', percentage),
-          limit.type === MCP_LIMIT_LABEL ? '—' : formatResetCell(limit.nextResetTime)
-        ];
-      })
-    : [['No quota data available', '—', '—', '—']];
-  return formatMarkdownTable(['Window', 'Usage', 'Progress', 'Resets In'], ['--------', '------:', '----------', '-----------'], rows);
-}
-
-function formatQuotaUsageTable(quotaData: ProcessedQuotaLimit | null): string {
-  // Credit-based usage straight from the CREDIT_LIMIT entries (unit 3x5 = 5h, 6x1 = weekly)
-  const fiveHourLimit = quotaData?.limits?.find((limit) => limit.type === FIVE_HOUR_TOKEN_LIMIT_LABEL);
-  const weeklyLimit = quotaData?.limits?.find((limit) => limit.type === 'Token usage(Weekly)');
-  const fhCurrent = asNumber(fiveHourLimit?.currentValue);
-  const fhTotal = asNumber(fiveHourLimit?.total);
-  const wCurrent = asNumber(weeklyLimit?.currentValue);
-  const wTotal = asNumber(weeklyLimit?.total);
-  const mcpLimit = quotaData?.limits?.find((limit) => limit.type === MCP_LIMIT_LABEL);
-  const mcpCurrent = asNumber(mcpLimit?.currentValue);
-  const mcpTotal = asNumber(mcpLimit?.total);
-  const rows: string[][] = [
-    ['💰 **5h Credits Used**', fhCurrent === null || fhTotal === null ? '—' : `**${formatNumber(fhCurrent)} / ${formatNumber(fhTotal)}**`]
+function formatQuotaLimitsTable(quota: Quota): string {
+  const windows: [string, QuotaWindow | null, boolean][] = [
+    [`${ROW_EMOJI.TOKEN} 5h Credits`, quota.fiveHour, true],
+    [`${ROW_EMOJI.WEEKLY} Weekly Credits`, quota.weekly, true],
+    ...quota.other.map((w): [string, QuotaWindow, boolean] => [`Credits (unit ${w.unit ?? '?'} × ${w.number ?? '?'})`, w, true]),
+    [`${ROW_EMOJI.MCP} MCP (1 Month)`, quota.mcp, false]
   ];
-  if (wCurrent !== null && wTotal !== null) {
-    rows.push(['📅 **Weekly Credits Used**', `**${formatNumber(wCurrent)} / ${formatNumber(wTotal)}**`]);
+  const rows = windows
+    .filter((entry): entry is [string, QuotaWindow, boolean] => entry[1] !== null)
+    .map(([label, window, resets]) => {
+      const percentage = window.percentage ?? 0;
+      return [
+        label,
+        window.percentage === null ? '—' : `${percentage.toFixed(1)}%`,
+        formatProgressLine('', percentage),
+        resets ? formatResetCell(window.resetsAt) : '—'
+      ];
+    });
+  return formatMarkdownTable(
+    ['Window', 'Usage', 'Progress', 'Resets In'],
+    ['--------', '------:', '----------', '-----------'],
+    rows.length > 0 ? rows : [['No quota data available', '—', '—', '—']]
+  );
+}
+
+function formatQuotaUsageTable(quota: Quota): string {
+  const rows: string[][] = [['💰 **5h Credits Used**', formatUsed(quota.fiveHour)]];
+  if (quota.weekly?.used != null && quota.weekly.total != null) {
+    rows.push(['📅 **Weekly Credits Used**', formatUsed(quota.weekly)]);
   }
-  rows.push(['🔌 **MCP Used**', mcpCurrent === null || mcpTotal === null ? '—' : `**${mcpCurrent} / ${mcpTotal}**`]);
+  rows.push(['🔌 **MCP Used**', quota.mcp?.used == null || quota.mcp.total == null ? '—' : `**${quota.mcp.used} / ${quota.mcp.total}**`]);
   return formatMarkdownTable(['Metric', 'Value'], ['--------', '------:'], rows);
 }
 
@@ -262,13 +163,10 @@ function formatMcpToolLabel(modelCode: string): string {
   return modelCode;
 }
 
-function formatMcpBreakdownTable(quotaData: ProcessedQuotaLimit | null): string {
-  const mcpLimit = quotaData?.limits?.find((limit) => limit.type === MCP_LIMIT_LABEL);
-  const details = Array.isArray(mcpLimit?.usageDetails)
-    ? mcpLimit.usageDetails
-    : [];
-  const rows = details.length
-    ? details.map((detail) => [formatMcpToolLabel(String((detail as Record<string, unknown>).modelCode)), formatNumber(Number((detail as Record<string, unknown>).usage))])
+function formatMcpBreakdownTable(quota: Quota): string {
+  const tools = quota.mcp?.tools ?? [];
+  const rows = tools.length
+    ? tools.map((tool) => [formatMcpToolLabel(tool.code), tool.usage === null ? '—' : formatNumber(tool.usage)])
     : [['No MCP data available', '—']];
   return formatMarkdownTable(['Tool', 'Count'], ['------', '------:'], rows);
 }
@@ -315,19 +213,18 @@ function formatMarkdownOutput(
   credentials: Credentials,
   startTime: string,
   endTime: string,
-  quotaData: ProcessedQuotaLimit | null,
+  quota: Quota,
   modelData: Record<string, unknown> | null,
   toolData: Record<string, unknown> | null,
   detailed: boolean,
   failures: Record<string, string> = {}
 ): string {
   const platformName = getPlatformName(credentials.platform);
-  const level = quotaData?.level as string | undefined;
   return [
-    formatMarkdownHeader(platformName, startTime, endTime, level, credentials),
-    `${SECTION_HEADERS.QUOTA_LIMITS}\n\n${formatQuotaLimitsTable(quotaData)}`,
-    `${SECTION_HEADERS.QUOTA_USAGE}\n\n${formatQuotaUsageTable(quotaData)}`,
-    `${SECTION_HEADERS.MCP_BREAKDOWN}\n\n${formatMcpBreakdownTable(quotaData)}`,
+    formatMarkdownHeader(platformName, startTime, endTime, quota.level, credentials),
+    `${SECTION_HEADERS.QUOTA_LIMITS}\n\n${formatQuotaLimitsTable(quota)}`,
+    `${SECTION_HEADERS.QUOTA_USAGE}\n\n${formatQuotaUsageTable(quota)}`,
+    `${SECTION_HEADERS.MCP_BREAKDOWN}\n\n${formatMcpBreakdownTable(quota)}`,
     `${SECTION_HEADERS.MODEL_USAGE}\n\n${failures.modelUsage ? unavailable(failures.modelUsage) : formatModelUsageTable(modelData, detailed)}`,
     `${SECTION_HEADERS.TOOL_USAGE}\n\n${failures.toolUsage ? unavailable(failures.toolUsage) : formatToolUsageTable(toolData)}`
   ].join('\n\n');
@@ -375,7 +272,7 @@ async function queryAllUsage(credentials: Credentials, detailed: boolean): Promi
   if (quotaResult.status === 'rejected') {
     throw quotaResult.reason;
   }
-  const quotaData = processQuotaLimit(quotaResult.value.data);
+  const quota = parseQuota(quotaResult.value.data);
   const modelData = modelResult.status === 'fulfilled'
     ? ((modelResult.value.data || modelResult.value) as Record<string, unknown>)
     : null;
@@ -385,7 +282,7 @@ async function queryAllUsage(credentials: Credentials, detailed: boolean): Promi
   const failures: Record<string, string> = {};
   if (modelResult.status === 'rejected') failures.modelUsage = summarizeError(modelResult.reason);
   if (toolResult.status === 'rejected') failures.toolUsage = summarizeError(toolResult.reason);
-  return formatMarkdownOutput(credentials, startTime, endTime, quotaData, modelData, toolData, detailed, failures);
+  return formatMarkdownOutput(credentials, startTime, endTime, quota, modelData, toolData, detailed, failures);
 }
 
 /**
