@@ -33,8 +33,7 @@ import {
 import { createMarkdownError, GlmReportError, summarizeError } from './utils/error-formatter.js';
 import {
   FIVE_HOUR_TOKEN_LIMIT_LABEL,
-  getTokenLimitLabel,
-  isFiveHourTokenLimit
+  getTokenLimitLabel
 } from './utils/token-limits.js';
 import type { Credentials } from './utils/credentials.js';
 import { getCredentials } from './utils/credentials.js';
@@ -43,7 +42,6 @@ import { getCredentials } from './utils/credentials.js';
 // CONSTANTS
 // ============================================================================
 
-const DEFAULT_TOKEN_LIMIT = 40000000;
 const MCP_LIMIT_LABEL = 'MCP usage(1 Month)';
 const TOKEN_LIMIT_TYPE = 'TOKENS_LIMIT';
 const CREDIT_LIMIT_TYPE = 'CREDIT_LIMIT';
@@ -130,34 +128,6 @@ function processQuotaLimit(data: unknown): ProcessedQuotaLimit {
  */
 function formatNumber(num: number): string {
   return num.toLocaleString('en-US');
-}
-
-/**
- * Get token limit information from quota data
- */
-function getTokenLimitInfo(quotaData: ProcessedQuotaLimit | null): { tokenLimit: number; tokenPct: number } {
-  let tokenLimit = DEFAULT_TOKEN_LIMIT;
-  let tokenPct = 0;
-  let hasFiveHourMatch = false;
-  if (!quotaData?.limits) return { tokenLimit, tokenPct };
-  for (const limit of quotaData.limits) {
-    if (isFiveHourTokenLimit(limit)) {
-      tokenPct = typeof limit.percentage === 'number' ? limit.percentage : 0;
-      tokenLimit = limit.total || DEFAULT_TOKEN_LIMIT;
-      hasFiveHourMatch = true;
-      break;
-    }
-  }
-  if (!hasFiveHourMatch) {
-    for (const limit of quotaData.limits) {
-      if (limit.rawType === TOKEN_LIMIT_TYPE || limit.rawType === CREDIT_LIMIT_TYPE || limit.type === FIVE_HOUR_TOKEN_LIMIT_LABEL) {
-        tokenPct = typeof limit.percentage === 'number' ? limit.percentage : 0;
-        tokenLimit = limit.total || DEFAULT_TOKEN_LIMIT;
-        break;
-      }
-    }
-  }
-  return { tokenLimit, tokenPct };
 }
 
 /**
@@ -303,17 +273,13 @@ function formatMcpBreakdownTable(quotaData: ProcessedQuotaLimit | null): string 
   return formatMarkdownTable(['Tool', 'Count'], ['------', '------:'], rows);
 }
 
-function formatModelUsageTable(modelData: Record<string, unknown> | null, quotaData: ProcessedQuotaLimit | null, detailed: boolean): string {
+function formatModelUsageTable(modelData: Record<string, unknown> | null, detailed: boolean): string {
   const totalUsage = modelData?.totalUsage as Record<string, unknown> | undefined;
   const rows: string[][] = [];
-  const { tokenLimit, tokenPct } = getTokenLimitInfo(quotaData);
   const calls = asNumber(totalUsage?.totalModelCallCount);
   const tokens = asNumber(totalUsage?.totalTokensUsage);
   if (tokens !== null) {
     rows.push(['🔢 Total Tokens (24h)', formatNumber(tokens)]);
-  }
-  if (tokenPct > 0 && tokenLimit !== DEFAULT_TOKEN_LIMIT) {
-    rows.push(['⏱️ 5h Window', `${tokenPct.toFixed(1)}% of ${formatNumber(tokenLimit)} credits`]);
   }
   if (calls !== null) {
     rows.push(['📞 Total Calls', formatNumber(calls)]);
@@ -362,7 +328,7 @@ function formatMarkdownOutput(
     `${SECTION_HEADERS.QUOTA_LIMITS}\n\n${formatQuotaLimitsTable(quotaData)}`,
     `${SECTION_HEADERS.QUOTA_USAGE}\n\n${formatQuotaUsageTable(quotaData)}`,
     `${SECTION_HEADERS.MCP_BREAKDOWN}\n\n${formatMcpBreakdownTable(quotaData)}`,
-    `${SECTION_HEADERS.MODEL_USAGE}\n\n${failures.modelUsage ? unavailable(failures.modelUsage) : formatModelUsageTable(modelData, quotaData, detailed)}`,
+    `${SECTION_HEADERS.MODEL_USAGE}\n\n${failures.modelUsage ? unavailable(failures.modelUsage) : formatModelUsageTable(modelData, detailed)}`,
     `${SECTION_HEADERS.TOOL_USAGE}\n\n${failures.toolUsage ? unavailable(failures.toolUsage) : formatToolUsageTable(toolData)}`
   ].join('\n\n');
 }

@@ -33,20 +33,3 @@ export function getTokenLimitLabel(limit: { type?: unknown; unit?: unknown; numb
 
   return 'Token usage';
 }
-
-export function isFiveHourTokenLimit(limit: {
-  type?: unknown;
-  rawType?: unknown;
-  unit?: unknown;
-  number?: unknown;
-}): boolean {
-  const unit = asFiniteNumber(limit.unit);
-  const number = asFiniteNumber(limit.number);
-  const rawType = limit.rawType;
-
-  if ((rawType === TOKEN_LIMIT_TYPE || rawType === CREDIT_LIMIT_TYPE) && unit === 3 && number === 5) {
-    return true;
-  }
-
-  return limit.type === FIVE_HOUR_TOKEN_LIMIT_LABEL;
-}
