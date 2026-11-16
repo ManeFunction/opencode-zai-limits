@@ -43,6 +43,7 @@ import { getCredentials } from '../dist/utils/credentials.js'
 import { getEndpoints } from '../dist/api/endpoints.js'
 import { queryEndpoint } from '../dist/api/client.js'
 import { parseQuota } from '../dist/quota.js'
+import { formatDuration, timeUntil } from '../dist/utils/duration.js'
 import { executeGlmQuota } from '../dist/index.js'
 
 const REFRESH_MS = 2 * 60 * 1000
@@ -66,26 +67,6 @@ function isZaiProvider(providerID) {
 function remainingPct(window) {
   if (!window || window.percentage === null) return null
   return Math.max(0, Math.min(100, 100 - window.percentage))
-}
-
-function fmtHm(ms) {
-  const totalMin = Math.max(0, Math.floor(ms / 60000))
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return h > 0 ? `${h}h ${m}m` : `${m}m`
-}
-
-function fmtLong(ms) {
-  // Weekly window: days when >= 24h, hours+minutes under a day
-  const totalMin = Math.max(0, Math.floor(ms / 60000))
-  if (totalMin >= 24 * 60) return `${Math.floor(totalMin / (24 * 60))}d`
-  return fmtHm(ms)
-}
-
-function timeLeft(ms) {
-  if (typeof ms !== 'number' || !Number.isFinite(ms)) return null
-  const left = ms - Date.now()
-  return left > 0 ? left : null
 }
 
 function colorFor(pct) {
@@ -321,9 +302,9 @@ export default {
         if (r5 >= 100) {
           parts.push('5h : 100%')
         } else {
-          const left = timeLeft(d.fiveHour?.resetsAt)
+          const left = timeUntil(d.fiveHour?.resetsAt)
           if (left !== null) {
-            parts.push(`${fmtHm(left)} : ${Math.round(r5)}%`)
+            parts.push(`${formatDuration(left)} : ${Math.round(r5)}%`)
           } else {
             parts.push(`${Math.round(r5)}%`)
           }
@@ -333,8 +314,8 @@ export default {
       // Weekly window: always time left + %, days first under-a-day falls back to h/m
       const rw = remainingPct(d.weekly)
       if (rw !== null) {
-        const left = timeLeft(d.weekly?.resetsAt)
-        const t = left === null ? null : fmtLong(left)
+        const left = timeUntil(d.weekly?.resetsAt)
+        const t = left === null ? null : formatDuration(left, 'short')
         parts.push(t ? `${t} : ${Math.round(rw)}%` : `${Math.round(rw)}%`)
       }
 

@@ -32,6 +32,7 @@ import {
 } from './utils/markdown-constants.js';
 import { createMarkdownError, GlmReportError, summarizeError } from './utils/error-formatter.js';
 import { asNumber, parseQuota } from './quota.js';
+import { formatClock, formatDuration, timeUntil } from './utils/duration.js';
 import type { Quota, QuotaWindow } from './quota.js';
 import type { Credentials } from './utils/credentials.js';
 import { getCredentials } from './utils/credentials.js';
@@ -55,31 +56,13 @@ function formatPlanLevel(level: string | null): string {
 }
 
 function formatResetCell(resetAt: number | null): string {
-  if (resetAt === null) {
+  const left = timeUntil(resetAt);
+  if (resetAt === null || left === null) {
     return '—';
   }
-  const diffMs = resetAt - Date.now();
-  if (diffMs <= 0) {
-    return '—';
-  }
-  const totalMinutes = Math.floor(diffMs / (1000 * 60));
-  // Format countdown portion
-  let countdown: string;
-  if (totalMinutes >= 24 * 60) {
-    const totalHours = Math.floor(totalMinutes / 60);
-    countdown = `${Math.floor(totalHours / 24)}d ${totalHours % 24}h`;
-  } else {
-    countdown = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
-  }
-  // Format local reset time portion (Issue #34: show actual clock time)
-  const resetDate = new Date(resetAt);
-  const hh = String(resetDate.getHours()).padStart(2, '0');
-  const mm = String(resetDate.getMinutes()).padStart(2, '0');
-  if (totalMinutes >= 24 * 60) {
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return `${countdown} (${dayNames[resetDate.getDay()]} ${hh}:${mm})`;
-  }
-  return `${countdown} (${hh}:${mm})`;
+  // Countdown plus the local clock time it lands on (Issue #34)
+  const overADay = left >= 24 * 60 * 60 * 1000;
+  return `${formatDuration(left)} (${formatClock(resetAt, overADay)})`;
 }
 
 function formatMarkdownTable(headers: string[], separator: string[], rows: string[][]): string {
