@@ -10,9 +10,11 @@
  *   returns its argument), so the SDK dependency is not needed at runtime
  *   and this plugin stays zero-dependency. V1-style plugin functions do
  *   not load in OpenCode V2 — keep this shape.
- * - The tool is registered through `ctx.tool.transform` and keeps the name
- *   `glm_quota`, so the `/glm-limits` command and the `glm-quota-exec`
- *   agent keep working.
+ * - The tool is registered through `ctx.tool.transform` under the name
+ *   `glm_quota`, so agents can check the quota themselves. The `/glm-limits`
+ *   slash command does not go through it: the TUI part (`tui.tsx`) calls
+ *   `executeGlmQuota` directly and shows the report in a dialog, with no
+ *   agent and no model call.
  * - `options: { codemode: true }` also exposes the tool to Code Mode.
  * - Credential discovery lives in `utils/credentials.ts` and reads the
  *   OpenCode v2 SQLite store (opencode.db) first, then auth.json, then env.
