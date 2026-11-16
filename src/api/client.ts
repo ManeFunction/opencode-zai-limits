@@ -249,8 +249,11 @@ function makeRequest(options: RequestOptions): Promise<ApiResponse> {
 
     const req = https.request(httpsOptions, (res) => {
       let data = '';
+      // Decode as a stream so multi-byte characters split across chunks
+      // (Chinese model names, error bodies) are not garbled.
+      res.setEncoding('utf8');
 
-      res.on('data', (chunk) => {
+      res.on('data', (chunk: string) => {
         data += chunk;
       });
 
