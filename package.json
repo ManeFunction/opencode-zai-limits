@@ -1,5 +1,5 @@
 {
-  "name": "opencode-glm-limits",
+  "name": "opencode-zai-limits",
   "version": "0.1.0",
   "type": "module",
   "description": "Credit meter and usage reports for the Z.ai GLM Coding Plan in OpenCode v2 \u2014 a footer status line and a /zai-limits command, both free of credits and tokens, with zero dependencies",
@@ -39,11 +39,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ManeFunction/opencode-glm-limits.git"
+    "url": "git+https://github.com/ManeFunction/opencode-zai-limits.git"
   },
-  "homepage": "https://github.com/ManeFunction/opencode-glm-limits#readme",
+  "homepage": "https://github.com/ManeFunction/opencode-zai-limits#readme",
   "bugs": {
-    "url": "https://github.com/ManeFunction/opencode-glm-limits/issues"
+    "url": "https://github.com/ManeFunction/opencode-zai-limits/issues"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

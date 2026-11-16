@@ -22,6 +22,9 @@ for commit messages.
 
 ### Changed
 - Renamed the `/glm-limits` command to `/zai-limits` and the `glm_quota` tool to `opencode-zai-limits`.
+- **Breaking:** the package is now `opencode-zai-limits` (was `opencode-glm-limits`) and installs into
+  `~/.config/opencode/plugins/opencode-zai-limits/`. Delete the old `opencode-glm-limits/` folder when upgrading, or
+  you get two meters.
 - The quota response is parsed once (`src/quota.ts`) and both the report and the meter read the
   result; the report renderer lives in `src/report/` as a pure function.
 - The TUI part is type-checked (`npm run typecheck`) and imports the server part through one
