@@ -7,11 +7,10 @@
  */
 
 import { getPlatformName } from '../api/platforms.js';
-import { formatProgressLine } from '../utils/progress-bar.js';
 import {
   MAIN_TITLE_PREFIX,
   MCP_TOOL_LABELS,
-  ROW_EMOJI,
+  ROW_BULLET,
   SECTION_HEADERS
 } from '../utils/markdown-constants.js';
 import { formatClock, formatDuration, timeUntil } from '../utils/duration.js';
@@ -94,38 +93,26 @@ function formatUsed(window: QuotaWindow | null): string {
   return `**${formatNumber(window.used)} / ${formatNumber(window.total)}**`;
 }
 
-function formatQuotaLimitsTable(quota: Quota, now: number): string {
+function formatQuotaUsageTable(quota: Quota, now: number): string {
   const windows: [string, QuotaWindow | null, boolean][] = [
-    [`${ROW_EMOJI.TOKEN} 5h Credits`, quota.fiveHour, true],
-    [`${ROW_EMOJI.WEEKLY} Weekly Credits`, quota.weekly, true],
-    ...quota.other.map((w): [string, QuotaWindow, boolean] => [`Credits (unit ${w.unit ?? '?'} × ${w.number ?? '?'})`, w, true]),
-    [`${ROW_EMOJI.MCP} MCP (1 Month)`, quota.mcp, false]
+    [`${ROW_BULLET} 5h Credits`, quota.fiveHour, true],
+    [`${ROW_BULLET} Weekly Credits`, quota.weekly, true],
+    ...quota.other.map((w): [string, QuotaWindow, boolean] => [`${ROW_BULLET} Credits (unit ${w.unit ?? '?'} × ${w.number ?? '?'})`, w, true]),
+    [`${ROW_BULLET} MCP (1 Month)`, quota.mcp, false]
   ];
   const rows = windows
     .filter((entry): entry is [string, QuotaWindow, boolean] => entry[1] !== null)
-    .map(([label, window, resets]) => {
-      const percentage = window.percentage ?? 0;
-      return [
-        label,
-        window.percentage === null ? '—' : `${percentage.toFixed(1)}%`,
-        formatProgressLine(percentage),
-        resets ? formatResetCell(window.resetsAt, now) : '—'
-      ];
-    });
+    .map(([label, window, resets]) => [
+      label,
+      formatUsed(window),
+      window.percentage === null ? '—' : `${window.percentage.toFixed(1)}%`,
+      resets ? formatResetCell(window.resetsAt, now) : '—'
+    ]);
   return formatMarkdownTable(
-    ['Window', 'Usage', 'Progress', 'Resets In'],
-    ['--------', '------:', '----------', '-----------'],
+    ['Window', 'Value', 'Usage', 'Resets In'],
+    ['--------', '------:', '------:', '-----------'],
     rows.length > 0 ? rows : [['No quota data available', '—', '—', '—']]
   );
-}
-
-function formatQuotaUsageTable(quota: Quota): string {
-  const rows: string[][] = [['💰 **5h Credits Used**', formatUsed(quota.fiveHour)]];
-  if (quota.weekly?.used != null && quota.weekly.total != null) {
-    rows.push(['📅 **Weekly Credits Used**', formatUsed(quota.weekly)]);
-  }
-  rows.push(['🔌 **MCP Used**', formatUsed(quota.mcp)]);
-  return formatMarkdownTable(['Metric', 'Value'], ['--------', '------:'], rows);
 }
 
 function formatMcpToolLabel(modelCode: string): string {
@@ -161,14 +148,14 @@ function formatModelUsageTable(modelData: Record<string, unknown> | null, detail
     if (!calls) calls = null;
   }
   if (tokens !== null) {
-    rows.push(['🔢 Total Tokens (24h)', formatNumber(tokens)]);
+    rows.push([`${ROW_BULLET} Total Tokens (24h)`, formatNumber(tokens)]);
   }
   if (calls !== null) {
-    rows.push(['📞 Total Calls', formatNumber(calls)]);
+    rows.push([`${ROW_BULLET} Total Calls`, formatNumber(calls)]);
   }
   if (detailed) {
     for (const model of models) {
-      rows.push([`🤖 ${model.name}`, model.tokens === null ? '—' : formatNumber(model.tokens)]);
+      rows.push([`${ROW_BULLET} ${model.name}`, model.tokens === null ? '—' : formatNumber(model.tokens)]);
     }
   }
   return formatMarkdownTable(['Metric', 'Value'], ['--------', '------:'], rows.length > 0 ? rows : [['No model usage data available', '—']]);
@@ -188,7 +175,7 @@ function formatToolUsageTable(toolData: Record<string, unknown> | null): string 
 }
 
 function formatSection(section: UsageSection, render: (data: Record<string, unknown> | null) => string): string {
-  return 'failed' in section ? `⚠️ Unavailable: ${section.failed}` : render(section.data);
+  return 'failed' in section ? `${ROW_BULLET} Unavailable: ${section.failed}` : render(section.data);
 }
 
 /**
@@ -198,8 +185,7 @@ export function formatReport(input: ReportInput): string {
   const { credentials, window, now, quota, detailed } = input;
   return [
     formatMarkdownHeader(getPlatformName(credentials.platform), window.startTime, window.endTime, quota.level, credentials),
-    `${SECTION_HEADERS.QUOTA_LIMITS}\n\n${formatQuotaLimitsTable(quota, now)}`,
-    `${SECTION_HEADERS.QUOTA_USAGE}\n\n${formatQuotaUsageTable(quota)}`,
+    `${SECTION_HEADERS.QUOTA_USAGE}\n\n${formatQuotaUsageTable(quota, now)}`,
     `${SECTION_HEADERS.MCP_BREAKDOWN}\n\n${formatMcpBreakdownTable(quota)}`,
     `${SECTION_HEADERS.MODEL_USAGE}\n\n${formatSection(input.modelUsage, (data) => formatModelUsageTable(data, detailed))}`,
     `${SECTION_HEADERS.TOOL_USAGE}\n\n${formatSection(input.toolUsage, formatToolUsageTable)}`

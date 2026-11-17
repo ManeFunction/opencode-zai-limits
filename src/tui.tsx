@@ -249,6 +249,14 @@ function ReportDialog(props: { context: TuiContext; report: () => string | null;
   const muted = () => themeColor(ctx, (t) => t.text.muted, DIM)
   const base = () => themeColor(ctx, (t) => t.text.base, '#d4d4d4')
   const rows = Math.max(8, Math.floor((ctx.renderer?.height ?? 30) * 0.6))
+  // The scrollbox fills whatever height it is given, so give it the measured
+  // height of the report (capped at `rows`). Until the first measurement it
+  // keeps the old fixed height, so a missing callback only costs empty space.
+  const [contentHeight, setContentHeight] = createSignal<number | null>(null)
+  const visibleHeight = () => {
+    const measured = contentHeight()
+    return measured === null ? rows : Math.min(Math.max(1, measured), rows)
+  }
   let scroll: ScrollBox | undefined
 
   // Same keys as OpenCode's own scrollable dialogs; Esc is handled by the
@@ -275,21 +283,26 @@ function ReportDialog(props: { context: TuiContext; report: () => string | null;
           {'↑↓ scroll · r refresh · esc close'}
         </text>
       </box>
-      <scrollbox ref={(r: ScrollBox) => (scroll = r)} maxHeight={rows} scrollbarOptions={{ visible: false }}>
-        <Show
-          when={props.report()}
-          fallback={<text fg={muted()}>Loading usage from the monitoring API…</text>}
+      <scrollbox ref={(r: ScrollBox) => (scroll = r)} height={visibleHeight()} scrollbarOptions={{ visible: false }}>
+        <box
+          flexDirection="column"
+          flexShrink={0}
+          onSizeChange={function (this: { height: number }) {
+            setContentHeight(this.height)
+          }}
         >
-          <box flexDirection="column">
-            <For each={parseReport(props.report())}>
-              {(block) => <ReportBlock context={ctx} block={block} />}
-            </For>
-          </box>
-        </Show>
+          <Show
+            when={props.report()}
+            fallback={<text fg={muted()}>Loading usage from the monitoring API…</text>}
+          >
+            <box flexDirection="column">
+              <For each={parseReport(props.report())}>
+                {(block) => <ReportBlock context={ctx} block={block} />}
+              </For>
+            </box>
+          </Show>
+        </box>
       </scrollbox>
-      <text fg={muted()} paddingTop={1} wrapMode="none">
-        {'No model call: this report costs no credits or tokens.'}
-      </text>
     </box>
   )
 }

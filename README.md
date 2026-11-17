@@ -23,7 +23,7 @@ command talk to a plain monitoring endpoint, so they never burn the credits they
   Solid signal, so it stays live in long sessions. Inside a session it appears only while a Z.AI/Zhipu model is
   selected; the home screen footer always shows it. The line turns from green to yellow to red as the 5h credits
   drain, and says `z.ai | key rejected — run /connect` instead of showing old numbers when the API rejects your key.
-- **`/zai-limits` command**: the full report in a dialog: credit limits per window with progress bars, credits used,
+- **`/zai-limits` command**: the full report in a dialog: credits used, usage and reset time per window, the
   MCP tool breakdown, 24h model usage per model and tool calls. It is a TUI command (also in the command palette as
   *GLM credit limits*), so it runs instantly and never starts an agent.
 - **Credit-native**: speaks the CREDIT_LIMIT format (5h and weekly windows), not the legacy token quotas; no fake
@@ -93,19 +93,13 @@ That's all: no command or agent files to copy. **To remove it**, delete the plug
 ```
 ### 📊 Z.ai GLM Coding Plan — Lite
 
-##### 🪙 Quota Limits
-
-| Window | Usage | Progress | Resets In |
-|--------|------:|----------|-----------|
-| ⏱️ 5h Credits | 38.0% | `█████░░░░░░░` | 2h 28m (23:29) |
-| 📅 Weekly Credits | 7.0% | `█░░░░░░░░░░░` | 6d 20h (Thu 17:02) |
-
 ##### 📊 Quota Usage
 
-| Metric | Value |
-|--------|------:|
-| 💰 **5h Credits Used** | **767 / 2,000** |
-| 📅 **Weekly Credits Used** | **767 / 10,000** |
+| Window | Value | Usage | Resets In |
+|--------|------:|------:|-----------|
+| • 5h Credits | **767 / 2,000** | 38.0% | 2h 28m (23:29) |
+| • Weekly Credits | **767 / 10,000** | 7.0% | 6d 20h (Thu 17:02) |
+| • MCP (1 Month) | **40 / 1,000** | 4.0% | — |
 ```
 
 - The `opencode-zai-limits` tool is also exposed to agents and Code Mode, so a running agent can check the quota

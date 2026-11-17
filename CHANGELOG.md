@@ -29,8 +29,8 @@ monitoring GETs, with no agent and no model call.
 - `/zai-limits` TUI command (slash menu and command palette), registered by the TUI part. It
   builds the report directly and opens it in a scrollable dialog (`↑`/`↓`, `j`/`k`, PgUp/PgDn,
   `r` to refresh, `Esc` to close). No agent starts, so it **spends no credits or tokens**.
-- Credit-native report: quota limits table, credits used per window, MCP tool breakdown (with
-  thousands separators), 24h model usage (per model) and tool calls. Labels and totals come from
+- Credit-native report: one quota table (credits used, usage and reset time per window), MCP tool
+  breakdown (with thousands separators), 24h model usage (per model) and tool calls. Labels and totals come from
   the CREDIT_LIMIT entries of the monitoring API instead of the legacy TOKENS_LIMIT format.
 - API errors (bad key, rate limit, timeout, server error) are shown in the report instead of an
   empty "No quota data available" one; the monitor API's HTTP 200 `{"code":401,"success":false}`
