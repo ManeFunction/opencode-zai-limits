@@ -12,10 +12,10 @@ for commit messages.
 Initial release. Derived from [guyinwonder168/opencode-glm-quota](https://github.com/guyinwonder168/opencode-glm-quota)
 (as of [PR #52](https://github.com/guyinwonder168/opencode-glm-quota/pull/52) by @itelyatnikov80,
 commit `dafcf639`), security-reviewed and then reworked into its own zero-dependency project.
-Not a fork and not intended to be merged back — the credit-based UI and the footer meter live here.
+Not a fork and not intended to be merged back.
 
-Neither the footer meter nor `/zai-limits` spends credits or tokens: both only make plain
-monitoring GETs, with no agent and no model call.
+**THE BIGGEST IMPROVEMENT FOR THE END USER:** Neither the footer meter nor `/zai-limits` spends credits or tokens:
+both only make plain monitoring GETs, with no agent and no model call.
 
 ### Added
 - Footer credit meter (TUI part, `src/tui.tsx`): remaining 5-hour and weekly credits in the
