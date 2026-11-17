@@ -8,10 +8,13 @@ for commit messages.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-17
+Technical release to validate an nmp trusted publisher.
+
 ## [0.9.0] - 2026-11-17
-Initial release. Derived from [guyinwonder168/opencode-glm-quota](https://github.com/guyinwonder168/opencode-glm-quota)
-(as of [PR #52](https://github.com/guyinwonder168/opencode-glm-quota/pull/52) by @itelyatnikov80,
-commit `dafcf639`), security-reviewed and then reworked into its own zero-dependency project.
+Initial release.
+Derived from [guyinwonder168/opencode-glm-quota](https://github.com/guyinwonder168/opencode-glm-quota) (as of [PR #52](https://github.com/guyinwonder168/opencode-glm-quota/pull/52) by @itelyatnikov80, commit `dafcf639`),
+security-reviewed and then reworked into its own zero-dependency project.
 Not a fork and not intended to be merged back.
 
 **THE BIGGEST IMPROVEMENT FOR THE END USER:** Neither the footer meter nor `/zai-limits` spends credits or tokens:
