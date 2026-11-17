@@ -6,12 +6,14 @@
  *   a z.ai / Zhipu model is selected (reacts to model switches)
  * - home.footer.status = the home screen footer (always, when data is available)
  *
- * Format: `z.ai | 3h 33m : 55% | 2d : 80%`
- * - 1st segment (5h window): time to reset + remaining %; when full (100%),
- *   shows "5h : 100%"
- * - 2nd segment (weekly window): always time left + remaining %; days when
+ * Format: `z.ai | 3h 33m : 45% | 2d : 20%`
+ * - 1st segment (5h window): time to reset + used %; hidden while the window
+ *   has not started (nothing used), e.g. `z.ai | 2d : 20%`
+ * - 2nd segment (weekly window): always time left + used %; days when
  *   >= 24h, hours+minutes under a day
- * Percentages are REMAINING, colored green > 50 / yellow > 20 / red otherwise.
+ * - Both windows unused: `z.ai | full`
+ * Percentages are USED, the same figure as the /zai-limits "Usage" column.
+ * The color follows the remaining 5h credits: green > 50 / yellow > 20 / red.
  *
  * Also registers the `/zai-limits` slash command (and a command-palette
  * entry). It runs right here in the TUI: it builds the same Markdown report as
@@ -110,9 +112,14 @@ const YELLOW = '#eab308'
 const RED = '#ef4444'
 const DIM = '#808080'
 
-function remainingPct(window: QuotaWindow | null | undefined): number | null {
+function usedPct(window: QuotaWindow | null | undefined): number | null {
   if (!window || window.percentage === null) return null
-  return Math.max(0, Math.min(100, 100 - window.percentage))
+  return Math.max(0, Math.min(100, window.percentage))
+}
+
+function remainingPct(window: QuotaWindow | null | undefined): number | null {
+  const used = usedPct(window)
+  return used === null ? null : 100 - used
 }
 
 function colorFor(pct: number | null): string {
@@ -354,29 +361,29 @@ export default {
       if (!d) return null
       if (d.authFailed) return 'z.ai | key rejected — run /connect'
       const { fiveHour, weekly } = d.quota
+      const u5 = usedPct(fiveHour)
+      const uw = usedPct(weekly)
+      if (u5 === null && uw === null) return null
+      // Nothing used in any known window: no countdowns to show.
+      if ((u5 ?? 0) <= 0 && (uw ?? 0) <= 0) return 'z.ai | full'
       const parts: string[] = []
 
-      // 5h window: "3h 33m : 55%"; when full (100%), "5h : 100%"
-      const r5 = remainingPct(fiveHour)
-      if (r5 !== null) {
-        if (r5 >= 100) {
-          parts.push('5h : 100%')
+      // 5h window: "3h 33m : 45%" (used); hidden while the window has not
+      // started (nothing used yet)
+      if (u5 !== null && u5 > 0) {
+        const left = timeUntil(fiveHour?.resetsAt)
+        if (left !== null) {
+          parts.push(`${formatDuration(left)} : ${Math.round(u5)}%`)
         } else {
-          const left = timeUntil(fiveHour?.resetsAt)
-          if (left !== null) {
-            parts.push(`${formatDuration(left)} : ${Math.round(r5)}%`)
-          } else {
-            parts.push(`${Math.round(r5)}%`)
-          }
+          parts.push(`${Math.round(u5)}%`)
         }
       }
 
-      // Weekly window: always time left + %, days first under-a-day falls back to h/m
-      const rw = remainingPct(weekly)
-      if (rw !== null) {
+      // Weekly window: always time left + used %, days first under-a-day falls back to h/m
+      if (uw !== null) {
         const left = timeUntil(weekly?.resetsAt)
         const t = left === null ? null : formatDuration(left, 'short')
-        parts.push(t ? `${t} : ${Math.round(rw)}%` : `${Math.round(rw)}%`)
+        parts.push(t ? `${t} : ${Math.round(uw)}%` : `${Math.round(uw)}%`)
       }
 
       if (parts.length === 0) return null

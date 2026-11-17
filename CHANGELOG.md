@@ -8,6 +8,15 @@ for commit messages.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-18
+
+### Changed
+- The footer meter shows the percentage of credits **used** instead of the percentage left, matching the
+  *Usage* column of `/zai-limits`: `z.ai | 3h 33m : 45% | 2d : 20%`. The green/yellow/red color still follows
+  the remaining 5h credits.
+- A 5-hour window that has not started (nothing used) is left out of the meter (`z.ai | 2d : 20%`) instead of
+  showing `5h : 100%`, and the meter reads `z.ai | full` when nothing is used in either window.
+
 ## [0.9.1] - 2026-11-17
 Technical release to validate an nmp trusted publisher.
 

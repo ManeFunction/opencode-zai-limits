@@ -1,12 +1,12 @@
 # opencode-zai-limits
 
 A credit meter and usage report for the [Z.ai GLM Coding Plan](https://z.ai/subscribe), living inside
-[OpenCode v2](https://opencode.ai). It draws your remaining credits into the status line right below the input field
+[OpenCode v2](https://opencode.ai). It draws your credit usage into the status line right below the input field
 and gives you a `/zai-limits` command for the full report. Zero dependencies, zero tokens: both the meter and the
 command talk to a plain monitoring endpoint, so they never burn the credits they show.
 
 ```
- z.ai | 3h 33m : 55% | 2d : 80%
+ z.ai | 3h 33m : 45% | 2d : 20%
 ```
 
 > **💰 Neither the footer meter nor `/zai-limits` spends credits or tokens.** Both are plain monitoring GETs made by
@@ -19,7 +19,7 @@ command talk to a plain monitoring endpoint, so they never burn the credits they
 
 ## Features
 
-- **Footer status line**: remaining 5h and weekly credits with a reset countdown, refreshed every 2 minutes through a
+- **Footer status line**: used 5h and weekly credits (the same percentage as the report's *Usage* column) with a reset countdown, refreshed every 2 minutes through a
   Solid signal, so it stays live in long sessions. Inside a session it appears only while a Z.AI/Zhipu model is
   selected; the home screen footer always shows it. The line turns from green to yellow to red as the 5h credits
   drain, and says `z.ai | key rejected — run /connect` instead of showing old numbers when the API rejects your key.
@@ -87,9 +87,11 @@ OpenCode at load), and one plugin entry loads both.
 
 ## Usage
 
-- The **meter** is automatic. Format: `z.ai | 3h 33m : 55% | 2d : 80%`. The first segment is the 5-hour window (time
-  to reset, remaining), the second is the weekly one (days when ≥ 24h, hours and minutes under a day; always shown,
-  even when full). The 5-hour segment becomes `5h : 100%` when the window is fully recovered.
+- The **meter** is automatic. Format: `z.ai | 3h 33m : 45% | 2d : 20%`. The first segment is the 5-hour window (time
+  to reset, percentage used), the second is the weekly one (days when ≥ 24h, hours and minutes under a day; always shown,
+  even when unused). The 5-hour segment is hidden while that window has not started
+  (`z.ai | 2d : 20%`), and the line reads `z.ai | full` when nothing is used in either window. The color still follows
+  what is left of the 5h credits: green above 50%, yellow above 20%, red below.
 - **`/zai-limits`** (or *GLM credit limits* in the command palette) opens the detailed report in a dialog, free, no
   model call. Scroll with `↑`/`↓` (`j`/`k`, PgUp/PgDn), `r` refreshes, `Esc` closes. The report looks like this
   (shown here as the Markdown it is built from):
@@ -113,7 +115,7 @@ OpenCode at load), and one plugin entry loads both.
 **Things to know**
 
 - The 5-hour window on the Coding Plan is *rolling*: credits come back 5 hours after each consumption, so right after
-  the nominal reset the meter may still show 99% until the last old usage ages out.
+  the nominal reset the meter may still show 1% until the last old usage ages out.
 - The meter polls a monitoring endpoint every 2 minutes per OpenCode TUI process, and `/zai-limits` makes three
   requests when you open or refresh it. All of them are plain GETs, so neither consumes credits or tokens.
 - The monitor endpoints are not documented by Z.ai. They are the same ones the official console and plugins use, but
