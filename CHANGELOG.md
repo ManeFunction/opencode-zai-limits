@@ -18,6 +18,9 @@ Not a fork and not intended to be merged back.
 both only make plain monitoring GETs, with no agent and no model call.
 
 ### Added
+- Published on [npm](https://www.npmjs.com/package/opencode-zai-limits): install with
+  `opencode plugin add opencode-zai-limits` or `"plugins": ["opencode-zai-limits"]` in `opencode.jsonc`.
+  Later releases are published from GitHub Actions with trusted publishing and a provenance statement.
 - Footer credit meter (TUI part, `src/tui.tsx`): remaining 5-hour and weekly credits in the
   `prompt.footer.status` slot while a Z.AI/Zhipu model is selected (inside a session), and in
   `home.footer.status` on the home screen bottom line — one meter per screen, no duplicates.

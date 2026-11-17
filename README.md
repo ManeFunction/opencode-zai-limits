@@ -41,43 +41,47 @@ command talk to a plain monitoring endpoint, so they never burn the credits they
 
 ## Installation
 
-**opencode-zai-limits** is not published to npm or brew yet, so for now it is installed from a clone of this
-repository.
+**opencode-zai-limits** is available from a variety of sources.
+npm is recommended, because OpenCode installs and updates npm plugins on its own.
 
 You will need:
 - [OpenCode](https://opencode.ai) v2 (the one with `opencode.db`).
 - A [GLM Coding Plan](https://z.ai/subscribe) subscription with its API key connected in OpenCode
   (`/connect` → Z.AI Coding Plan / Z.AI / Zhipu).
 
-1) **Build and copy (manual installation)**
+1) **npm (Recommended for everyone)**
+    - Type `opencode plugin add opencode-zai-limits` in your Terminal. OpenCode downloads the plugin from
+      [npm](https://www.npmjs.com/package/opencode-zai-limits) and keeps it cached; there is nothing to build.
+    - Or add it to your global `~/.config/opencode/opencode.jsonc` yourself, and OpenCode installs it on the next
+      start: `"plugins": ["opencode-zai-limits"]`. Pin a version with `"opencode-zai-limits@0.9.0"`.
+    - Restart OpenCode. `opencode plugin list` should show `opencode-zai-limits`.
+    - You are perfect, the meter is in your footer and `/zai-limits` is in every session.
+    - Updates: `opencode plugin update opencode-zai-limits`. Removing: `opencode plugin remove opencode-zai-limits`.
+2) **Build and copy (manual installation, for advanced users)**
     - Clone the repository or download the source code from GitHub.
     - Go to the folder with the code in your Terminal.
     - Run `npm install --ignore-scripts` (nothing needs scripts; this only fetches the TypeScript compiler) and
       `npm run build` to produce `dist/`.
     - Copy the plugin into OpenCode's global plugins folder, so the layout is
-      `~/.config/opencode/plugins/opencode-zai-limits/` containing `package.json`, `dist/` and `src/`.
-    - Restart OpenCode. `opencode plugin list` should show the local plugin, the meter appears in the status line
-      whenever a Z.AI model is selected, and `/zai-limits` shows up in the slash menu.
+      `~/.config/opencode/plugins/opencode-zai-limits/` containing `package.json`, `dist/` and `src/`. OpenCode
+      finds plugin folders there on its own; to remove it, delete the folder.
+    - Restart OpenCode. `opencode plugin list` should show the local plugin.
     - You are perfect, the meter is in your footer and `/zai-limits` is in every session.
 
+Use one of the two, not both, or you get two meters.
+
 **Upgrading from an earlier setup?**
-- Installed it as `~/.config/opencode/plugins/opencode-glm-limits/`? Delete that folder and install into
-  `opencode-zai-limits/` instead, otherwise you get two meters.
+- Installed it as `~/.config/opencode/plugins/opencode-glm-limits/` (or `opencode-zai-limits/`) by hand and moving
+  to npm? Delete that folder, otherwise you get two meters.
 - Delete `~/.config/opencode/commands/glm-limits.md` and `~/.config/opencode/agents/glm-quota-exec.md` if you have
   them. The old Markdown command ran a subagent (a model call per run) and would clash with the built-in
   `/zai-limits`.
-- Coming from `opencode-glm-quota`? Delete `~/.config/opencode/plugins/opencode-glm-quota/`. Keeping both would give
-  you two footer meters and two quota tools side by side.
+- Coming from `opencode-glm-quota`? Remove it (its npm entry or its plugins folder). Keeping both would give you two
+  footer meters and two quota tools side by side.
 
-**What gets installed where**
-
-| Piece | Location | What it is |
-|---|---|---|
-| Plugin (server part) | `~/.config/opencode/plugins/opencode-zai-limits/` | registers the `opencode-zai-limits` tool for agents |
-| TUI part | `src/tui.tsx` inside the plugin folder | the footer meter and the `/zai-limits` command (compiled by OpenCode at load) |
-
-That's all: no command or agent files to copy. **To remove it**, delete the plugin folder. Nothing is written into
-`opencode.json(c)`; OpenCode discovers plugin folders on its own.
+There are no command or agent files to copy: the plugin has two parts, the server part (the `opencode-zai-limits`
+tool for agents) and the TUI part (`src/tui.tsx`: the footer meter and the `/zai-limits` command, compiled by
+OpenCode at load), and one plugin entry loads both.
 
 ---
 
@@ -164,6 +168,10 @@ There is no test suite yet; `npm run typecheck` is the check.
 | `src/utils/` | credentials, auth paths, durations, formatting, time windows |
 | `types/`, `tsconfig.tui.json` | type-checking setup for `tui.tsx` (no runtime role) |
 
+Releases are cut from a `vX.Y.Z` tag: the release workflow checks that the tag matches `package.json`, builds and
+type-checks, smoke-tests the packed tarball, publishes it to npm with trusted publishing (with a provenance statement,
+no stored token) and creates the GitHub release with the tarball attached.
+
 ---
 
 ## Credits
@@ -183,4 +191,7 @@ This is an unofficial project and is not affiliated with Z.ai, Zhipu or OpenCode
 
 This repo follows the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 
+[![npm version](https://img.shields.io/npm/v/opencode-zai-limits)](https://www.npmjs.com/package/opencode-zai-limits)
+[![npm downloads](https://img.shields.io/npm/dm/opencode-zai-limits)](https://www.npmjs.com/package/opencode-zai-limits)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/ManeFunction/opencode-zai-limits)](https://github.com/ManeFunction/opencode-zai-limits/releases/latest)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/ManeFunction?label=Sponsor&logo=GitHubSponsors&style=flat)](https://github.com/sponsors/ManeFunction)
