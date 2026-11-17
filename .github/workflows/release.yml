@@ -112,20 +112,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
-          RANGE="${PREV_TAG:+$PREV_TAG..}${GITHUB_REF_NAME}"
-
-          python3 .github/scripts/categorize_changelog.py "$RANGE" > changelog_section.md
-
           gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
             -f tag_name="$GITHUB_REF_NAME" --jq .body > auto_notes.md
 
-          {
-            cat auto_notes.md
-            echo ""
-            echo ""
-            cat changelog_section.md
-          } > release_notes.md
+          # CHANGELOG intro of this version (text above its first ### heading), then the auto notes,
+          # then Features/Fixes/Refactor from the commits since the previous tag.
+          python3 .github/scripts/release_notes.py --auto-notes auto_notes.md > release_notes.md
 
       - name: Create GitHub Release
         env:
