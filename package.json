@@ -1,8 +1,8 @@
 {
   "name": "opencode-zai-limits",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "type": "module",
-  "description": "Credit meter and usage reports for the Z.ai GLM Coding Plan in OpenCode v2 \u2014 a footer status line and a /zai-limits command, both free of credits and tokens, with zero dependencies",
+  "description": "Credit meter and usage reports for the Z.ai GLM Coding Plan in OpenCode v2 — a footer status line and a /zai-limits command, both free of credits and tokens, with zero dependencies",
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
