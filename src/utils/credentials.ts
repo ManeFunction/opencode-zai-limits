@@ -3,8 +3,9 @@
  * Finds the Z.ai / Zhipu API key for the GLM Coding Plan.
  *
  * Priority order (first match wins):
- *   1. OpenCode v2 credential store (SQLite `opencode.db`, read-only probe
- *      via the `sqlite3` CLI — no native dependencies).
+ *   1. OpenCode v2 credential store (SQLite `opencode.db`, opened read-only
+ *      with Bun's built-in `bun:sqlite`, or the `sqlite3` CLI outside Bun —
+ *      no dependencies either way).
  *   2. OpenCode v1 `auth.json` (XDG path; legacy LOCALAPPDATA on Windows).
  *   3. Environment variables (development/testing).
  */
@@ -35,7 +36,7 @@ export interface Credentials {
   label: string;
 }
 
-/** Timeout for the sqlite3 CLI probe. */
+/** Timeout for the sqlite3 CLI fallback. */
 const SQLITE_TIMEOUT_MS = 5000;
 
 /**
@@ -67,13 +68,55 @@ function opencodeDataDir(): string {
   return process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
 }
 
+/** The slice of `bun:sqlite` used here; Bun is not in this project's types. */
+interface BunSqliteModule {
+  Database: new (
+    filename: string,
+    options: { readonly: boolean }
+  ) => {
+    query(sql: string): { all(): unknown[] };
+    close(): void;
+  };
+}
+
 /**
- * Run a read-only query against a SQLite database via the sqlite3 CLI and
- * parse its `-json` output. Resolves [] on any failure (CLI missing, db
- * locked/missing, invalid JSON) so callers can fall through to other
- * credential sources. No native dependencies required.
+ * Run a read-only query through Bun's built-in SQLite driver. OpenCode runs
+ * plugins inside its own Bun runtime, so this needs no `sqlite3` CLI and no
+ * dependency. Returns null when not running under Bun or when the query
+ * fails, so the caller can fall back to the CLI.
  */
-function querySqliteJson(dbPath: string, sql: string): Promise<CredentialRow[]> {
+async function queryWithBunSqlite(dbPath: string, sql: string): Promise<CredentialRow[] | null> {
+  if (!('Bun' in globalThis)) return null;
+  try {
+    // A variable specifier keeps tsc (and Node) from resolving `bun:sqlite`.
+    const specifier = 'bun:sqlite';
+    const { Database } = (await import(specifier)) as BunSqliteModule;
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      return db.query(sql).all() as CredentialRow[];
+    } finally {
+      db.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Run a read-only query against a SQLite database: Bun's built-in driver
+ * first, then the sqlite3 CLI. Resolves [] when both fail so callers can
+ * fall through to other credential sources.
+ */
+async function querySqlite(dbPath: string, sql: string): Promise<CredentialRow[]> {
+  return (await queryWithBunSqlite(dbPath, sql)) ?? querySqliteCli(dbPath, sql);
+}
+
+/**
+ * Run a read-only query via the sqlite3 CLI (3.33+, for `-json`) and parse
+ * its output. Fallback for when the plugin code does not run under Bun.
+ * Resolves [] on any failure (CLI missing, db locked/missing, invalid JSON).
+ */
+function querySqliteCli(dbPath: string, sql: string): Promise<CredentialRow[]> {
   return new Promise((resolve) => {
     try {
       execFile(
@@ -107,7 +150,7 @@ function querySqliteJson(dbPath: string, sql: string): Promise<CredentialRow[]> 
  * {"type":"key","key":"…"}) and `integration_id` is the provider id.
  * Rows are ordered active-first, then most recently updated, so the current
  * key wins over stale or inactive copies.
- * @returns Credentials or null if not found / sqlite3 or db unavailable
+ * @returns Credentials or null if not found / db unreadable
  */
 export async function getCredentialsFromOpenCodeDb(): Promise<Credentials | null> {
   const dbPath = path.join(opencodeDataDir(), 'opencode', 'opencode.db');
@@ -117,7 +160,7 @@ export async function getCredentialsFromOpenCodeDb(): Promise<Credentials | null
 
   const idList = CANDIDATE_PROVIDER_IDS.map((id) => `'${id.replace(/'/g, "''")}'`).join(',');
   const sql = `SELECT integration_id, label, value FROM credential WHERE integration_id IN (${idList}) ORDER BY active DESC, time_updated DESC`;
-  const rows = await querySqliteJson(dbPath, sql);
+  const rows = await querySqlite(dbPath, sql);
 
   for (const row of rows) {
     try {

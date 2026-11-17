@@ -36,9 +36,10 @@ monitoring GETs, with no agent and no model call.
   empty "No quota data available" one; the monitor API's HTTP 200 `{"code":401,"success":false}`
   replies count as errors too.
 - `opencode-zai-limits` tool for agents and Code Mode that want to check the quota themselves.
-- Credential discovery from OpenCode v2's SQLite store (`opencode.db`, read-only `sqlite3` 3.33+
-  probe, scoped to the `zai`/`zhipu` provider rows), with `auth.json` and
-  `ZAI_API_KEY`/`ZHIPU_API_KEY` as fallbacks (inherited from the PR and kept).
+- Credential discovery from OpenCode v2's SQLite store (`opencode.db`, scoped to the `zai`/`zhipu` provider rows),
+  opened read-only with Bun's built-in `bun:sqlite` inside OpenCode's own runtime, so no `sqlite3` tool is needed.
+  The `sqlite3` 3.33+ CLI is the fallback outside Bun, and `auth.json` and `ZAI_API_KEY`/`ZHIPU_API_KEY` come after
+  that (inherited from the PR and kept).
 - OpenCode v2 plugin package `opencode-zai-limits`: auto-discovered from
   `~/.config/opencode/plugins/opencode-zai-limits/` via `exports` (`.` server part and `./tui` TUI
   part). Remove an old `opencode-glm-quota` plugin folder when switching, or you get two meters.

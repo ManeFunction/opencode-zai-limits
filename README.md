@@ -31,7 +31,7 @@ command talk to a plain monitoring endpoint, so they never burn the credits they
 - **Zero dependencies**: the server part is compiled plain TypeScript, the TUI part is JSX compiled by OpenCode
   itself. Nothing to install, nothing to audit.
 - **Reads your existing login**: takes the API key from OpenCode v2's credential store (`opencode.db`, opened
-  read-only through the `sqlite3` CLI), with `auth.json` and `ZAI_API_KEY` / `ZHIPU_API_KEY` as fallbacks. Works with
+  read-only with Bun's built-in SQLite inside OpenCode), with `auth.json` and `ZAI_API_KEY` / `ZHIPU_API_KEY` as fallbacks. Works with
   both the Global (`api.z.ai`) and China (`open.bigmodel.cn`) platforms.
 - **Coded conservatively**: the plugin calls the same three fixed monitor endpoints with the same auth header as
   Z.ai's own tooling; API failures (a bad key, rate limits, timeouts) are shown as such, with the key scrubbed from
@@ -48,9 +48,6 @@ You will need:
 - [OpenCode](https://opencode.ai) v2 (the one with `opencode.db`).
 - A [GLM Coding Plan](https://z.ai/subscribe) subscription with its API key connected in OpenCode
   (`/connect` → Z.AI Coding Plan / Z.AI / Zhipu).
-- The `sqlite3` command-line tool, version 3.33 or newer (it needs `-json`; ships with macOS and most Linux distros).
-  With an older `sqlite3` the key lookup in `opencode.db` fails silently and only `auth.json` and the environment
-  variables are tried.
 
 1) **Build and copy (manual installation)**
     - Clone the repository or download the source code from GitHub.
@@ -130,8 +127,9 @@ That's all: no command or agent files to copy. **To remove it**, delete the plug
 
 The server part registers the `opencode-zai-limits` tool for agents. Its credential module finds your GLM Coding Plan
 key (the `zai` / `zhipu` entries only; it never touches credentials of other providers) in OpenCode's SQLite store,
-opened `--readonly` through the `sqlite3` CLI with a 5-second timeout, falling back to the v1 `auth.json` and then
-environment variables. Requests go to `https://api.z.ai` or `https://open.bigmodel.cn` over HTTPS with the key in the
+opened read-only with `bun:sqlite`, the SQLite driver built into the Bun runtime OpenCode runs plugins in. If the code
+ever runs outside Bun, it falls back to the `sqlite3` CLI (3.33+, `--readonly`, 5-second timeout), then to the v1
+`auth.json` and environment variables. Requests go to `https://api.z.ai` or `https://open.bigmodel.cn` over HTTPS with the key in the
 `Authorization` header. The quota response is parsed once into a typed snapshot (`src/quota.ts`) that both the report
 and the meter read. When a request fails, the report shows the error (the key scrubbed from it) instead of empty
 tables.
