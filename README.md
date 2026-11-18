@@ -15,8 +15,6 @@ command talk to a plain monitoring endpoint, so they never burn the credits they
 > tool is still registered for agents that want to check the quota on their own; only that path involves a model,
 > because an agent is already running.
 
----
-
 ## Features
 
 - **Footer status line**: used 5h and weekly credits (the same percentage as the report's *Usage* column) with a reset countdown, refreshed every 2 minutes through a
@@ -36,8 +34,6 @@ command talk to a plain monitoring endpoint, so they never burn the credits they
 - **Coded conservatively**: the plugin calls the same three fixed monitor endpoints with the same auth header as
   Z.ai's own tooling; API failures (a bad key, rate limits, timeouts) are shown as such, with the key scrubbed from
   the message.
-
----
 
 ## Installation
 
@@ -83,8 +79,6 @@ There are no command or agent files to copy: the plugin has two parts, the serve
 tool for agents) and the TUI part (`src/tui.tsx`: the footer meter and the `/zai-limits` command, compiled by
 OpenCode at load), and one plugin entry loads both.
 
----
-
 ## Usage
 
 - The **meter** is automatic. Format: `z.ai | 3h 33m : 45% | 2d : 20%`. The first segment is the 5-hour window (time
@@ -121,8 +115,6 @@ OpenCode at load), and one plugin entry loads both.
 - The monitor endpoints are not documented by Z.ai. They are the same ones the official console and plugins use, but
   they may change without notice.
 
----
-
 ## How it works
 
 The server part registers the `opencode-zai-limits` tool for agents. Its credential module finds your GLM Coding Plan
@@ -145,8 +137,6 @@ earlier version cost a model call per run and this one costs nothing. The TUI co
 plugin types yet; it is taken from OpenCode 2.3's own built-in plugins, so a future release could change it.
 `Plugin.define()` in `@opencode/plugin` is an identity function (it returns its argument), so the plugin ships
 without the SDK and its ~180 MB dependency tree.
-
----
 
 ## Development
 
@@ -173,8 +163,6 @@ There is no test suite yet; `npm run typecheck` is the check.
 Releases are cut from a `vX.Y.Z` tag: the release workflow checks that the tag matches `package.json`, builds and
 type-checks, smoke-tests the packed tarball, publishes it to npm with trusted publishing (with a provenance statement,
 no stored token) and creates the GitHub release with the tarball attached.
-
----
 
 ## Credits
 
