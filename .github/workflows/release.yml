@@ -36,7 +36,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Build and type-check
-        run: npm run typecheck
+        run: npm run check
 
       - name: Pack
         run: npm pack --ignore-scripts
@@ -49,8 +49,11 @@ jobs:
           PKG_VERSION=$(node -p "require('/tmp/pkg/package/package.json').version")
           echo "tag=$TAG_VERSION package=$PKG_VERSION"
           test "$TAG_VERSION" = "$PKG_VERSION"
-          test -f /tmp/pkg/package/src/tui.tsx
-          test -f /tmp/pkg/package/dist/tui-support.js
+          node -e "const p = require('/tmp/pkg/package/package.json'); if (!p.exports['./tui'].endsWith('.js')) throw new Error('./tui must point at compiled JavaScript')"
+          node --check /tmp/pkg/package/dist/tui.js
+          # Every file dist/tui.js reaches must be inside the tarball (the checker runs
+          # from the repo, where Babel is installed; the tarball has no node_modules).
+          node scripts/check-tui.mjs /tmp/pkg/package/dist/tui.js
           node -e "import('/tmp/pkg/package/dist/index.js').then((m) => { if (typeof m.default !== 'object') process.exit(1) })"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -90,7 +93,7 @@ jobs:
           if [ "$(npm view "opencode-zai-limits@${VERSION}" version 2>/dev/null)" = "$VERSION" ]; then
             echo "opencode-zai-limits@${VERSION} is already on npm, skipping."
           else
-            npm publish --access public # prepublishOnly rebuilds dist/ and type-checks
+            npm publish --access public # prepublishOnly rebuilds dist/, type-checks and checks dist/tui.js
           fi
 
   github-release:

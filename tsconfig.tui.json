@@ -1,6 +1,6 @@
 {
-  // Type-checks the TUI part (src/tui.tsx) without emitting anything:
-  // OpenCode compiles it with its own Solid preset at load time. Run after
+  // Type-checks the TUI part (src/tui.tsx) without emitting anything: it is
+  // compiled to dist/tui.js by scripts/build-tui.mjs. Run after
   // `npm run build` — tui.tsx imports `../dist/tui-support.js`, which must
   // resolve to the emitted declarations, so a wrong import path fails here.
   "compilerOptions": {

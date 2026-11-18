@@ -8,6 +8,15 @@ for commit messages.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-18
+
+### Fixed
+- npm installations (`opencode plugin add opencode-zai-limits`) no longer fail with
+  `Cannot find package 'react' imported from .../src/tui.tsx`. The TUI part is now precompiled to `dist/tui.js`
+  at build time and the `./tui` export points there. OpenCode transforms local `.tsx` plugin parts with its
+  Solid/OpenTUI preset, but that transform skips files under `node_modules`, so the shipped source fell through
+  to Bun's default React JSX transform. Local plugin folders were not affected.
+
 ## [1.0.0] - 2026-11-18
 
 ### Changed

@@ -1,25 +1,25 @@
 {
   "name": "opencode-zai-limits",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Credit meter and usage reports for the Z.ai GLM Coding Plan in OpenCode v2 — a footer status line and a /zai-limits command, both free of credits and tokens, with zero dependencies",
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
-    "./tui": "./src/tui.tsx"
+    "./tui": "./dist/tui.js"
   },
   "files": [
     "dist",
-    "src",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc && tsc -p tsconfig.tui.json",
+    "build": "tsc && node scripts/build-tui.mjs",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.tui.json",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run typecheck"
+    "prepublishOnly": "npm run clean && npm run check",
+    "check": "npm run build && npm run typecheck && node scripts/check-tui.mjs dist/tui.js"
   },
   "keywords": [
     "opencode",
@@ -46,7 +46,10 @@
     "url": "https://github.com/ManeFunction/opencode-zai-limits/issues"
   },
   "devDependencies": {
-    "typescript": "^5.9.0",
-    "@types/node": "^20.0.0"
+    "@babel/core": "^7.29.13",
+    "@babel/preset-typescript": "^7.29.7",
+    "@types/node": "^20.0.0",
+    "babel-preset-solid": "1.9.19",
+    "typescript": "^5.9.0"
   }
 }

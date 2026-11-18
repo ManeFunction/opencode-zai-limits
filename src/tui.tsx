@@ -28,9 +28,12 @@
  *
  * Notes:
  * - `Plugin.define()` is an identity function (returns its argument), so the
- *   default export is a plain object. JSX is compiled by OpenCode's own plugin
- *   loader (verified: local .tsx TUI parts are transformed with the Solid
- *   preset to @opentui/solid at load time).
+ *   default export is a plain object.
+ * - This file is compiled to plain JavaScript (`dist/tui.js`) by
+ *   `scripts/build-tui.mjs` with Solid's Babel preset. OpenCode transforms
+ *   local .tsx TUI parts at load time, but its transform skips node_modules —
+ *   and an npm-installed plugin lives there — so the published package ships
+ *   the compiled file, not this source.
  * - Reuses the audited server-part modules for credentials (opencode.db via
  *   readonly sqlite3 CLI) and the HTTPS client (fixed api.z.ai hosts only).
  * - The raw quota response is read through `parseQuota` (src/quota.ts), the
